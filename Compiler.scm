@@ -32,10 +32,9 @@
   (lambda (in-file)
     (list->string (file->list in-file))))
 
-(define string->file
-  (lambda (str out-file)
-    (let ((out-port (open-output-file out-file 'truncate))
-          (lst (string->list str)))
+(define list->file
+  (lambda (lst out-file)
+    (let ((out-port (open-output-file out-file 'truncate)))
       (letrec ((run
                 (lambda (lst)
                   (if (null? lst)
@@ -101,11 +100,12 @@
 (define compile-scheme-file
   (lambda (source dest)
     (let* ((pipelined (list->sexprs (file->list source)))
-	   (size (length pipelined)))
+	   (size (length pipelined))
+	   (generated (map code-gen
+			   pipelined))
+	   (asm-code (fold-left string-append "" generated)))
       (display (format "Compiled Scheme File with ~a parsed expressions!\n" size))
-      (map code-gen
-	   pipelined)
-      )))
+      (list->file (string->list asm-code) dest))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Code Generation  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -116,6 +116,8 @@
 
 (define code-gen
   (lambda (pe)
+    ;;After each generation, the value of the generated code is in RAX
+    (display (format "Code Gen to ~a\n" pe))
     (cond ((tag? 'const pe)
 	   (cg-const (second pe)))
 	  ((tag? 'pvar pe))
@@ -123,7 +125,8 @@
 	  ((tag? 'fvar pe))
 	  ((tag? 'if3 pe))
 	  ((tag? 'or pe))
-	  ((tag? 'seq pe))
+	  ((tag? 'seq pe)
+	   (cg-seq (second pe)))
 	  ((tag? 'lambda-simple pe))
 	  ((tag? 'lambda-opt pe))
 	  ((tag? 'define pe))
@@ -143,4 +146,11 @@
 
 (define cg-const
   (lambda (const)
-    const))
+    (number->string const)))
+
+(define cg-seq
+  (lambda (pe)
+    (fold-left (lambda (result e)
+		 (string-append result (code-gen e) newLine))
+	       (list->string '())
+	       pe)))
