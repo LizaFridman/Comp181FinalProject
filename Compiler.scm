@@ -107,6 +107,25 @@
       (display (format "Compiled Scheme File with ~a parsed expressions!\n" size))
       (list->file (string->list asm-code) dest))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  C-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define c-table '())
+
+;;Gets a const in the table and returns its ADDRESS
+;;a.k.a:  c-table[i] = <Memory-Index, Value, (Type, Type-Data)>
+(define c-table-contains?
+  (lambda (const)
+    (cond ((empty? c-table)
+	   #f)
+	  ;;c-table[i] == const
+	  ((equal? const (second (car c-table)))
+	   (first (car c-table)))
+	  (else
+	   (c-table-contains? (cdr c-table) const)))))
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Code Generation  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define tag?
@@ -117,13 +136,15 @@
 (define code-gen
   (lambda (pe)
     ;;After each generation, the value of the generated code is in RAX
+    ;;Returns string
     (display (format "Code Gen to ~a\n" pe))
     (cond ((tag? 'const pe)
 	   (cg-const (second pe)))
 	  ((tag? 'pvar pe))
 	  ((tag? 'bvar pe))
 	  ((tag? 'fvar pe))
-	  ((tag? 'if3 pe))
+	  ((tag? 'if3 pe)
+	   (cg-if3 (pe)))
 	  ((tag? 'or pe))
 	  ((tag? 'seq pe)
 	   (cg-seq (second pe)))
@@ -146,7 +167,11 @@
 
 (define cg-const
   (lambda (const)
-    (number->string const)))
+    ;;(number->string const)
+    (let ((value (number->string (c-table-contains? const))))
+      (string-append
+       tab "MOV RAX, " value newLine)
+      )))
 
 (define cg-seq
   (lambda (pe)
