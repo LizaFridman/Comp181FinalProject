@@ -7,13 +7,17 @@
     (let ((in-port (open-input-file in-file)))
       (letrec ((run
 		(lambda ()
-		  (let ((ch (read-char in-port)))
-		    (if (eof-object? ch)
+		  (let ((readChar (read-char in-port)))
+		    (if (eof-object? readChar)
 			(begin
 			  (close-input-port in-port)
 			  '())
-			(cons ch (run)))))))
+			(cons readChar (run)))))))
 	(run)))))
+
+(define file->string
+  (lambda (in-file)
+    (list->string (file->list in-file))))
 
 (define string->file
   (lambda (str out-file)
@@ -44,28 +48,27 @@
 
 
 (define list->sexprs
-  (lambda (lst)
-      (letrec ((helper
+  (lambda (l)
+      (letrec ((translate
                 (lambda (lst)
-                  (display (format "lst = ~a\n" lst))
                   (<sexpr> lst 
-                           (lambda (e s) (if (null? s)
-                                             (list e)
-                                             (cons e (helper s))))
-                           (lambda (w) `(error ,@w))))))
-        (helper lst))))
+                           (lambda (expr rest) (if (null? rest)
+                                             (list expr)
+                                             (cons expr (translate rest))))
+                           (lambda (msg) `(error ,@msg))))))
+        (translate l))))
 
 (define string->sexprs
   (lambda (str)
-    (let ((lst (string->list str)))
-      (letrec ((helper
+    (let ((stringList (string->list str)))
+      (letrec ((translate
                 (lambda (lst)
                   (<sexpr> lst 
-                           (lambda (e s) (if (null? s)
-                                             (list e)
-                                             (cons e (helper s))))
-                           (lambda (w) `(error ,@w))))))
-        (helper lst)))))
+                           (lambda (expr rest) (if (null? rest)
+                                             (list expr)
+                                             (cons expr (translate rest))))
+                           (lambda (msg) `(error ,@msg))))))
+        (translate stringList)))))
 
 
 ;--------------------------------------------------| cTable |--------------------------------------------------------
@@ -91,4 +94,6 @@
 
 (define compile-scheme-file
   (lambda (source dest)
-    (display (format "Compiled Scheme File ~a to ~b\n" source dest))))
+    (let ((sexprs (list->sexprs (file->list source))))
+      (display (format "Compiled Scheme File!\n"))
+       )))

@@ -1,0 +1,5 @@
+(define testFunc
+  (lambda args
+    (if (list? args)
+      1
+      0)))
