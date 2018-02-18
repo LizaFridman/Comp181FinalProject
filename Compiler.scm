@@ -33,30 +33,23 @@
 
 
 (define pipeline
-  (lambda (s)
-    ((star <sexpr>) s
-     (lambda (m r)
-       (map (lambda (e)
+  (lambda (sexpr)
+    ((star <sexpr>) sexpr
+     (lambda (match rest)
+       (map (lambda (expr)
 	      (annotate-tc
 	       (pe->lex-pe
 		(box-set
 		 (remove-applic-lambda-nil
-		  (parse e))))))
-	    m))
-     (lambda (f) 'fail))))
+		  (parse expr))))))
+	    match))
+     (lambda (fail) 'fail))))
 
 
 
 (define list->sexprs
-  (lambda (l)
-      (letrec ((translate
-                (lambda (lst)
-                  (<sexpr> lst 
-                           (lambda (expr rest) (if (null? rest)
-                                             (list expr)
-                                             (cons expr (translate rest))))
-                           (lambda (msg) `(error ,@msg))))))
-        (translate l))))
+  (lambda (lst)
+        (pipeline lst)))
 
 (define string->sexprs
   (lambda (str)
@@ -94,6 +87,8 @@
 
 (define compile-scheme-file
   (lambda (source dest)
-    (let ((sexprs (list->sexprs (file->list source))))
-      (display (format "Compiled Scheme File!\n"))
-       )))
+    (let* ((pipelined (list->sexprs (file->list source)))
+	   (size (length pipelined)))
+      (display (format "Compiled Scheme File with ~a parsed expressions!\n" size))
+      ;;pipelined
+      )))
