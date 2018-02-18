@@ -2,6 +2,19 @@
 (load "tag-parser.scm")
 (load "semantic-analyzer.scm")
 
+
+(define first
+  (lambda (lst)
+    (car lst)))
+
+(define second
+  (lambda (lst)
+    (cadr lst)))
+
+(define third
+  (lambda (lst)
+    (caddr lst)))
+
 (define file->list
   (lambda (in-file)
     (let ((in-port (open-input-file in-file)))
@@ -90,5 +103,44 @@
     (let* ((pipelined (list->sexprs (file->list source)))
 	   (size (length pipelined)))
       (display (format "Compiled Scheme File with ~a parsed expressions!\n" size))
-      ;;pipelined
+      (map code-gen
+	   pipelined)
       )))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Code Generation  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define tag?
+  (lambda (tag pe)
+    (and (list? pe)
+	 (equal? tag (first pe)))))
+
+(define code-gen
+  (lambda (pe)
+    (cond ((tag? 'const pe)
+	   (cg-const (second pe)))
+	  ((tag? 'pvar pe))
+	  ((tag? 'bvar pe))
+	  ((tag? 'fvar pe))
+	  ((tag? 'if3 pe))
+	  ((tag? 'or pe))
+	  ((tag? 'seq pe))
+	  ((tag? 'lambda-simple pe))
+	  ((tag? 'lambda-opt pe))
+	  ((tag? 'define pe))
+	  ((tag? 'applic pe))
+	  ((tag? 'tc-applic pe))
+	  ((tag? 'set pe))
+	  ((tag? 'box pe))
+	  ((tag? 'box-get pe))
+	  ((tag? 'box-set? pe))
+	  (else 'Code-Generation-Error!))))
+
+(define newLine
+  (list->string '(#\newline)))
+
+(define tab
+  (list->string '(#\tab)))
+
+(define cg-const
+  (lambda (const)
+    const))
