@@ -39,7 +39,7 @@
 (define var?
   (lambda (expr)
     (and (pair? expr)
-	 (eq? 'var (car expr)))))
+	 (equal? 'var (car expr)))))
 
 (define var-in-body?
   (lambda (var)
@@ -71,7 +71,7 @@
       (cond ((not (pair? pe))
 	     #f)
 	    ;;(set (var ,var) (expr))
-	    ((and (eq? 'set (car pe))
+	    ((and (equal? 'set (car pe))
 		  (equal? var (cadr pe)))
 	     #t)
 	    (else (ormap (var-set? var)
@@ -87,7 +87,7 @@
 		 (member var pe))
 	     #t)
 	    ;;(set (var ,var) (expr))
-	    ((eq? 'set (car pe))
+	    ((equal? 'set (car pe))
 	     ((var-get? var) (caddr pe)))
 	    (else (ormap (var-get? var)
 			 pe))))))
@@ -105,17 +105,17 @@
 	     
 	     '())
 	    (else
-	     
 	     (map (remove-param-lambda param)
 		  pe))))))
 
 (define to-box?
   (lambda (arg pe)
-    (let ((param-removed ((remove-param-lambda arg) pe)))
-     (and ((bound-var? `(var ,arg)) param-removed)
-	  ((var-set? `(var ,arg)) param-removed)
-	  ((var-get? `(var ,arg)) param-removed)
-	  ))))
+    (let* ((var `(var ,arg))
+	   (param-removed ((remove-param-lambda arg) pe)))
+      (and ((bound-var? var) param-removed)
+	   ((var-set? var) param-removed)
+	   ((var-get? var) param-removed)
+	   ))))
 
 (define box-arg
   (lambda (arg)
@@ -125,12 +125,12 @@
 	    
 	    ;;(var arg)
 	    ((and (var? pe)
-		  (eq? arg (cadr pe)))
+		  (equal? arg (cadr pe)))
 	     `(box-get ,pe))
 	    
 	    ;;(set (var arg) expr)
-	    ((and (eq? 'set (car pe))
-		  (eq? arg (cadadr pe)))
+	    ((and (equal? 'set (car pe))
+		  (equal? arg (cadadr pe)))
 	       `(box-set ,(cadr pe) ,((box-arg arg) (caddr pe))))
 	    
 	    ;;(lambda-simple (args) (body))
@@ -167,7 +167,7 @@
 				    args))))
       (if (null? sets-to-add)
 	  body
-	  `(seq ,(append sets-to-add (if (eq? 'seq (car body))
+	  `(seq ,(append sets-to-add (if (equal? 'seq (car body))
 					(box-body args (cadr body))
 					(list (box-body args body)))))))))
 

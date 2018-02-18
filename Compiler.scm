@@ -41,3 +41,54 @@
 	    m))
      (lambda (f) 'fail))))
 
+
+
+(define list->sexprs
+  (lambda (lst)
+      (letrec ((helper
+                (lambda (lst)
+                  (display (format "lst = ~a\n" lst))
+                  (<sexpr> lst 
+                           (lambda (e s) (if (null? s)
+                                             (list e)
+                                             (cons e (helper s))))
+                           (lambda (w) `(error ,@w))))))
+        (helper lst))))
+
+(define string->sexprs
+  (lambda (str)
+    (let ((lst (string->list str)))
+      (letrec ((helper
+                (lambda (lst)
+                  (<sexpr> lst 
+                           (lambda (e s) (if (null? s)
+                                             (list e)
+                                             (cons e (helper s))))
+                           (lambda (w) `(error ,@w))))))
+        (helper lst)))))
+
+
+;--------------------------------------------------| cTable |--------------------------------------------------------
+
+
+;  is empty or not a list   -> returns saved results
+;  car passes test          -> save car, remove it and do on the rest
+;  car is a list            -> open the car and do again
+;  else                     -> remove car and do on the rest
+(define those-that-pass
+  (lambda (exps test positive-results)
+    (cond 
+          ((or (not (pair? exps)) (null? exps)) positive-results)
+          ((test (car exps)) (those-that-pass (cdr exps) test (cons (car exps) positive-results)))
+          ((pair? (car exps)) (those-that-pass `(,@(car exps) ,@(cdr exps)) test positive-results))
+          (else (those-that-pass (cdr exps) test positive-results)))))
+
+; returns deep search, returns elements that pass test
+(define ordered-those-that-pass
+  (lambda (exps test)
+    (reverse (those-that-pass exps test '()))))
+
+
+(define compile-scheme-file
+  (lambda (source dest)
+    (display (format "Compiled Scheme File ~a to ~b\n" source dest))))
