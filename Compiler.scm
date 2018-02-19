@@ -151,7 +151,9 @@
 			 ((tag? 'pvar pe)
 			  (cg-pvar pe))
 			 
-			 ((tag? 'bvar pe))
+			 ((tag? 'bvar pe)
+			 ;;(bvar x major minor)
+			  (cg-bvar (third pe) (forth pe)))
 			 
 			 ((tag? 'fvar pe))
 			 
@@ -231,7 +233,14 @@
   (lambda (pe)
     (let ((minor (third pe)))
       (string-append
-       tab "MOV RAX, [" (number->string (+ minor 2)) "]" newLine))))
+       tab "MOV RAX, qword [rbp + " (number->string (+ minor 4)) "*8]" newLine))))
+
+(define cg-bvar
+  (lambda (major minor)
+    (string-append
+     tab "MOV RAX, qword [rbp + 2*8]" newLine
+     tab "MOV RAX, qword [RAX + " major "*8]" newLine
+     tab "MOV RAX, qword [RAX + " minor "*8]" newLine)))
 
 (define cg-if3
   (lambda (test dit dif)
