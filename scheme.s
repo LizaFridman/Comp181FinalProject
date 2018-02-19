@@ -148,7 +148,7 @@
 section .bss
 
 extern exit, printf, scanf
-global write_sob, write_sob_if_not_void, start_of_data, sobTrue, sobFalse
+global write_sob, write_sob_if_not_void, start_of_data, sobTrue, sobFalse, sobVoid
 	
 section .data
 start_of_data:
@@ -198,6 +198,8 @@ sobTrue:
 	dq SOB_TRUE 
 sobFalse:
 	dq SOB_FALSE
+sobVoid:
+	dq SOB_VOID
 
 	
 section .text			

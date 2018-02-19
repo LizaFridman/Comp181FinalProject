@@ -171,18 +171,34 @@
 			  ;;(seq (E1 .. En))
 			  (cg-seq (second pe)))
 	  
-			 ((tag? 'lambda-simple pe))
+			 ((tag? 'lambda-simple pe)
+			  "")
 			 
-			 ((tag? 'lambda-opt pe))
+			 ((tag? 'lambda-opt pe)
+			  "")
 			 
-			 ((tag? 'define pe))
+			 ((tag? 'define pe)
+			  "")
 			 
 			 ((tag? 'applic pe)
 			  (string-append ";" (format "~a" pe)))
 			 
 			 ((tag? 'tc-applic pe))
 			 
-			 ((tag? 'set pe))
+			 ((tag? 'set pe)
+			  ;;(set var value)
+			  (let* ((var (second pe))
+				 (value (third pe))
+				 (cg-val (code-gen value)))
+			    (string-append cg-val
+					   (cond ((tag? 'bvar var)
+						  (cg-set-bvar (cdr var)))
+						 ((tag? 'pvar var)
+						  (cg-set-pvar (cdr var)))
+						 ((tag? 'fvar var)
+						  (cg-set-fvar (cdr var)))
+						 (else "Undefined variable type"))
+					   tab "MOV RAX, sobVoid" newLine)))
 			 
 			 ((tag? 'box pe))
 			 
@@ -267,6 +283,23 @@
 		 (string-append result (code-gen e) newLine))
 	       (list->string '())
 	       pe)))
+
+(define cg-set-bvar
+  (lambda (var major minor)
+    (string-append
+     tab "MOV RBX, qword [rbp + 2*8]" newLine
+     tab "MOV RBX, qword [RBX + " major "*8]" newLine
+     tab "MOV RBX, qword [RBX + " minor "*8]" newLine
+     tab "MOV qword [RBX], RAX" newLine)))
+
+(define cg-set-pvar
+  (lambda (var minor)
+    (string-append
+     tab "MOV qword [rbp + " (+ 4 minor) "*8], RAX" newLine)))
+
+(define cg-set-fvar
+  (lambda (var)
+    (string-append)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

@@ -1,1 +1,4 @@
-(or 1 2 3)
+(lambda (a)
+  (lambda (b)
+    a
+    b))
