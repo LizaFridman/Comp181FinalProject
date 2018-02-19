@@ -110,7 +110,7 @@
 			   pipelined))
 	   (asm-code (fold-left string-append "" generated)))
       (display (format "Compiled Scheme File with ~a parsed expressions!\n" size))
-      (list->file (string->list asm-code) dest))))
+      (list->file (string->list (string-append pre-text asm-code post-text)) dest))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  C-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -223,7 +223,7 @@
 	    (else
 	     (let ((cg-i (code-gen (first lst))))
 	       (string-append cg-i newLine
-			      tab "CMP RAX, SOB_FALSE" newLine
+			      tab "CMP RAX, sobFalse" newLine
 			      tab "JNE " end-label newLine
 			      (cg-or (cdr lst) end-label)))))))
 
@@ -242,7 +242,7 @@
 	  (l-end (make-label "L_if3End")))
       
       (string-append test-cg newLine
-		     tab "CMP RAX, SOB_FALSE" newLine
+		     tab "CMP RAX, sobFalse + 8 - start_of_data" newLine
 		     tab "JE " l-dif newLine
 		     dit-cg newLine
 		     tab "JMP " l-end newLine
@@ -258,3 +258,52 @@
 		 (string-append result (code-gen e) newLine))
 	       (list->string '())
 	       pe)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define param-get-def (string-append
+		       newLine
+		       ";;; Parameter Getters" newLine
+		       newLine
+		       "%define param(offset) qword [rbp + offset]" newLine
+		       newLine
+		       "struc scmframe" newLine
+		       ".old_rbp: resq 1" newLine
+		       ".ret_addr: resq 1" newLine
+		       ".env: resq 1" newLine
+		       ".arg_count: resq 1" newLine
+		       ".A0: resq 1" newLine
+		       ".A1: resq 1" newLine
+		       ".A2: resq 1" newLine
+		       ".A3: resq 1" newLine
+		       ".A4: resq 1" newLine
+		       ".A5: resq 1" newLine
+		       "endstruc" newLine
+		       newLine
+		       "%define old_rbp param(scmframe.old_rbp)" newLine
+		       "%define ret_addr param(scmframe.ret_addr))" newLine
+		       "%define env param(scmframe.env)" newLine
+		       "%define arg_count param(scmframe.arg_count))" newLine
+		       "%define A0 param(scmframe.A0)" newLine
+		       "%define A1 param(scmframe.A1)" newLine
+		       "%define A2 param(scmframe.A2)" newLine
+		       "%define A3 param(scmframe.A3)" newLine
+		       "%define A4 param(scmframe.A4)" newLine
+		       "%define A5 param(scmframe.A5)" newLine
+		       "%define An(n) qword [rbp + 8*(n+4)]" newLine
+		       newLine
+		       ))
+
+(define pre-text (string-append
+		  "section .bss" newLine
+		  "extern write_sob, write_sob_if_not_void, sobTrue, sobFalse, start_of_data" newLine
+		  "global main" newLine
+		  param-get-def 
+		  "section .text" newLine
+		  newLine
+		  "main:" newLine))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Post-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define post-text "")
