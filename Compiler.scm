@@ -148,7 +148,8 @@
 		   (cond ((tag? 'const pe)
 			  (cg-const (second pe)))
 			 
-			 ((tag? 'pvar pe))
+			 ((tag? 'pvar pe)
+			  (cg-pvar pe))
 			 
 			 ((tag? 'bvar pe))
 			 
@@ -161,7 +162,8 @@
 				(dif (forth pe)))
 			    (cg-if3 test dit dif)))
 			 
-			 ((tag? 'or pe))
+			 ((tag? 'or pe)
+			  (cg-or (second pe) (make-label "L_orEnd")))
 			 
 			 ((tag? 'seq pe)
 			  ;;(seq (E1 .. En))
@@ -174,7 +176,7 @@
 			 ((tag? 'define pe))
 			 
 			 ((tag? 'applic pe)
-			  (string-append ";Applic " (format "~a" pe)))
+			  (string-append ";" (format "~a" pe)))
 			 
 			 ((tag? 'tc-applic pe))
 			 
@@ -208,6 +210,28 @@
       (string-append
        tab "MOV RAX, " value newLine)
       )))
+
+
+(define cg-or
+  (lambda (lst end-label)
+      (cond ((null? lst)
+	     (list->string '()))
+	    ((null? (cdr lst))
+	     (let ((cg-N (code-gen (first lst))))
+	       (string-append cg-N newLine
+			      end-label ":" newLine)))
+	    (else
+	     (let ((cg-i (code-gen (first lst))))
+	       (string-append cg-i newLine
+			      tab "CMP RAX, SOB_FALSE" newLine
+			      tab "JNE " end-label newLine
+			      (cg-or (cdr lst) end-label)))))))
+
+(define cg-pvar
+  (lambda (pe)
+    (let ((minor (third pe)))
+      (string-append
+       tab "MOV RAX, [" (number->string (+ minor 2)) "]" newLine))))
 
 (define cg-if3
   (lambda (test dit dif)
