@@ -306,4 +306,10 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Post-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define post-text "")
+(define l-exit "L_exit")
+
+(define post-text (string-append newLine
+				 l-exit ":" newLine
+				 tab "PUSH RAX" newLine
+				 tab "call write_sob" newLine
+				 tab "POP RAX"newLine))
