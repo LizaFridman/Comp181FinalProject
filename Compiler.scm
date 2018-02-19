@@ -15,6 +15,10 @@
   (lambda (lst)
     (caddr lst)))
 
+(define forth
+  (lambda (lst)
+    (cadddr lst)))
+
 (define file->list
   (lambda (in-file)
     (let ((in-port (open-input-file in-file)))
@@ -97,6 +101,7 @@
     (reverse (those-that-pass exps test '()))))
 
 
+
 (define compile-scheme-file
   (lambda (source dest)
     (let* ((pipelined (list->sexprs (file->list source)))
@@ -116,8 +121,9 @@
 ;;a.k.a:  c-table[i] = <Memory-Index, Value, (Type, Type-Data)>
 (define c-table-contains?
   (lambda (const)
-    (cond ((empty? c-table)
-	   #f)
+    (cond ((null? c-table)
+	   ;;#f
+	   0)
 	  ;;c-table[i] == const
 	  ((equal? const (second (car c-table)))
 	   (first (car c-table)))
@@ -137,33 +143,63 @@
   (lambda (pe)
     ;;After each generation, the value of the generated code is in RAX
     ;;Returns string
-    (display (format "Code Gen to ~a\n" pe))
-    (cond ((tag? 'const pe)
-	   (cg-const (second pe)))
-	  ((tag? 'pvar pe))
-	  ((tag? 'bvar pe))
-	  ((tag? 'fvar pe))
-	  ((tag? 'if3 pe)
-	   (cg-if3 (pe)))
-	  ((tag? 'or pe))
-	  ((tag? 'seq pe)
-	   (cg-seq (second pe)))
-	  ((tag? 'lambda-simple pe))
-	  ((tag? 'lambda-opt pe))
-	  ((tag? 'define pe))
-	  ((tag? 'applic pe))
-	  ((tag? 'tc-applic pe))
-	  ((tag? 'set pe))
-	  ((tag? 'box pe))
-	  ((tag? 'box-get pe))
-	  ((tag? 'box-set? pe))
-	  (else 'Code-Generation-Error!))))
+    ;;(display (format "Code Gen to ~a\n" pe))
+    (string-append ";" (format "~a" pe) newLine
+		   (cond ((tag? 'const pe)
+			  (cg-const (second pe)))
+			 
+			 ((tag? 'pvar pe))
+			 
+			 ((tag? 'bvar pe))
+			 
+			 ((tag? 'fvar pe))
+			 
+			 ((tag? 'if3 pe)
+			  ;;(if3 test dit dif)
+			  (let ((test (second pe))
+				(dit (third pe))
+				(dif (forth pe)))
+			    (cg-if3 test dit dif)))
+			 
+			 ((tag? 'or pe))
+			 
+			 ((tag? 'seq pe)
+			  ;;(seq (E1 .. En))
+			  (cg-seq (second pe)))
+	  
+			 ((tag? 'lambda-simple pe))
+			 
+			 ((tag? 'lambda-opt pe))
+			 
+			 ((tag? 'define pe))
+			 
+			 ((tag? 'applic pe)
+			  (string-append ";Applic " (format "~a" pe)))
+			 
+			 ((tag? 'tc-applic pe))
+			 
+			 ((tag? 'set pe))
+			 
+			 ((tag? 'box pe))
+			 
+			 ((tag? 'box-get pe))
+	  
+			 ((tag? 'box-set? pe))
+			 
+			 (else 'Code-Generation-Error!)))))
 
 (define newLine
   (list->string '(#\newline)))
 
 (define tab
   (list->string '(#\tab)))
+
+(define labelIndex 0)
+
+(define make-label
+  (lambda (name)
+    (set! labelIndex (+ labelIndex 1))
+    (string-append name (number->string labelIndex))))
 
 (define cg-const
   (lambda (const)
@@ -173,9 +209,28 @@
        tab "MOV RAX, " value newLine)
       )))
 
+(define cg-if3
+  (lambda (test dit dif)
+    (let ((test-cg (code-gen test))
+	  (dit-cg (code-gen dit))
+	  (dif-cg (code-gen dif))
+	  (l-dif (make-label "L_if3Dif"))
+	  (l-end (make-label "L_if3End")))
+      
+      (string-append test-cg newLine
+		     tab "CMP RAX, SOB_FALSE" newLine
+		     tab "JE " l-dif newLine
+		     dit-cg newLine
+		     tab "JMP " l-end newLine
+		     l-dif ":" newLine
+		     dif-cg newLine
+		     l-end ":" newLine
+		     ))))
+    
 (define cg-seq
   (lambda (pe)
     (fold-left (lambda (result e)
+		 ;;(display (format "cg-seq: e = ~a\nresult = ~b\n" e result))
 		 (string-append result (code-gen e) newLine))
 	       (list->string '())
 	       pe)))
