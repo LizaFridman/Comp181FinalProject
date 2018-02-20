@@ -106,7 +106,9 @@
   (lambda (source dest)
     (let* ((pipelined (list->sexprs (file->list source)))
 	   (size (length pipelined))
-	   (generated (map code-gen
+	   (generated (map (lambda (expr)
+			     (string-append (code-gen expr)
+					    cg-print-rax))
 			   pipelined))
 	   (asm-code (fold-left string-append "" generated)))
       (display (format "Compiled Scheme File with ~a parsed expressions!\n" size))
@@ -198,7 +200,8 @@
 			  "")
 			 
 			 ((tag? 'define pe)
-			  "")
+			  ;; (define var value)
+			  (cg-define (cdr pe)))
 			 
 			 ((tag? 'applic pe)
 			  (string-append ";" (format "~a" pe)))
@@ -240,6 +243,11 @@
   (lambda (name)
     (set! labelIndex (+ labelIndex 1))
     (string-append name (number->string labelIndex))))
+
+(define cg-print-rax
+    (string-append
+     tab "PUSH RAX" newLine
+     tab "call write_sob_if_not_void" newLine))
 
 (define cg-const
   (lambda (const)
@@ -285,21 +293,23 @@
     (string-append
      tab "MOV RAX, [" (number->string (f-table-get var)) "]" newLine
      tab "CMP RAX, " undefined newLine
-     tab "JE " u-label newLine))))
+     tab "JE "u-label newLine))))
 
 (define cg-if3
   (lambda (test dit dif)
     (let ((test-cg (code-gen test))
 	  (dit-cg (code-gen dit))
 	  (dif-cg (code-gen dif))
-	  (l-dif (make-label "L_if3Dif"))
-	  (l-end (make-label "L_if3End")))
+	  (l-dif (make-label "L_ifDif"))
+	  (l-end (make-label "L_ifEnd")))
       
       (string-append test-cg newLine
-		     tab "CMP RAX, sobFalse + 8 - start_of_data" newLine
+		     tab "MOV RBX, sobFalse" newLine
+		     tab "CMP RAX, RBX" newLine
 		     tab "JE " l-dif newLine
 		     dit-cg newLine
 		     tab "JMP " l-end newLine
+
 		     l-dif ":" newLine
 		     dif-cg newLine
 		     l-end ":" newLine
@@ -308,7 +318,7 @@
 (define cg-seq
   (lambda (pe)
     (fold-left (lambda (result e)
-		 ;;(display (format "cg-seq: e = ~a\nresult = ~b\n" e result))
+	  ;;(display (format "cg-seq: e = ~a\nresult = ~b\n" e result))
 		 (string-append result (code-gen e) newLine))
 	       (list->string '())
 	       pe)))
@@ -332,6 +342,14 @@
   (lambda (var)
     (string-append
      tab "MOV qword [" (number->string (f-table-get var)) "], RAX" newLine)))
+
+
+(define cg-define
+  (lambda (var value)
+    (let ((address (number->string (f-table-get var f-table))))
+    (string-append (code-gen value) newLine
+		   tab "MOV qword [" address "], RAX" newLine
+		   tab "MOV RAX, sobVoid" newLine))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -385,5 +403,4 @@
 (define post-text (string-append newLine
 				 l-exit ":" newLine
 				 tab "PUSH RAX" newLine
-				 tab "call write_sob" newLine
-				 tab "POP RAX"newLine))
+				 tab "call write_sob" newLine))

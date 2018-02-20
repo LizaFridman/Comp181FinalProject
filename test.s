@@ -34,9 +34,11 @@ endstruc
 section .text
 
 main:
-;(lambda-simple (a) (lambda-simple (b) (seq ((bvar a 0 0) (pvar b 0)))))
+;(const 1)
+	MOV RAX, 0
+	PUSH RAX
+	call write_sob_if_not_void
 
 L_exit:
 	PUSH RAX
 	call write_sob
-	POP RAX
