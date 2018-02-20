@@ -120,17 +120,36 @@
 ;;Gets a const in the table and returns its ADDRESS
 ;;a.k.a:  c-table[i] = <Memory-Index, Value, (Type, Type-Data)>
 (define c-table-contains?
-  (lambda (const)
-    (cond ((null? c-table)
+  (lambda (const ct)
+    (cond ((null? ct)
 	   ;;#f
 	   0)
 	  ;;c-table[i] == const
-	  ((equal? const (second (car c-table)))
-	   (first (car c-table)))
+	  ((equal? const (second (car ct)))
+	   (first (car ct)))
 	  (else
-	   (c-table-contains? (cdr c-table) const)))))
+	   (c-table-contains? (cdr ct) const)))))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  F-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define f-table '())
+
+(define f-table-contains?
+  (lambda (var ft)
+    (let ((row (first ft)))
+      (cond ((null? ft)
+	     ;;#f
+	   0)
+	    ((equal? var (first row))
+	     (second row))
+	    (else (f-table-contains? var (cdr ft)))))))
+
+;; TODO: Check if this is the same as contains?
+(define f-table-get
+  ;; Returns the memory address of the var
+  (lambda (var)
+    (second (assoc var f-table))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Code Generation  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -141,9 +160,9 @@
 
 (define code-gen
   (lambda (pe)
-    ;;After each generation, the value of the generated code is in RAX
-    ;;Returns string
-    ;;(display (format "Code Gen to ~a\n" pe))
+    ;; After each generation, the value of the generated code is in RAX
+    ;; Returns string
+    ;; (display (format "Code Gen to ~a\n" pe))
     (string-append ";" (format "~a" pe) newLine
 		   (cond ((tag? 'const pe)
 			  (cg-const (second pe)))
@@ -155,7 +174,8 @@
 			 ;;(bvar x major minor)
 			  (cg-bvar (third pe) (forth pe)))
 			 
-			 ((tag? 'fvar pe))
+			 ((tag? 'fvar pe)
+			  (cg-fvar (second pe)))
 			 
 			 ((tag? 'if3 pe)
 			  ;;(if3 test dit dif)
@@ -186,7 +206,7 @@
 			 ((tag? 'tc-applic pe))
 			 
 			 ((tag? 'set pe)
-			  ;;(set var value)
+			  ;;(set! (*var var * *) value)
 			  (let* ((var (second pe))
 				 (value (third pe))
 				 (cg-val (code-gen value)))
@@ -224,7 +244,7 @@
 (define cg-const
   (lambda (const)
     ;;(number->string const)
-    (let ((value (number->string (c-table-contains? const))))
+    (let ((value (number->string (c-table-contains? const c-table))))
       (string-append
        tab "MOV RAX, " value newLine)
       )))
@@ -257,6 +277,15 @@
      tab "MOV RAX, qword [rbp + 2*8]" newLine
      tab "MOV RAX, qword [RAX + " major "*8]" newLine
      tab "MOV RAX, qword [RAX + " minor "*8]" newLine)))
+
+(define cg-fvar
+  (lambda (var)
+    (let ((undefined 0)
+	  (u-label "L_error_undefined_fvar"))
+    (string-append
+     tab "MOV RAX, [" (number->string (f-table-get var)) "]" newLine
+     tab "CMP RAX, " undefined newLine
+     tab "JE " u-label newLine))))
 
 (define cg-if3
   (lambda (test dit dif)
@@ -298,8 +327,11 @@
      tab "MOV qword [rbp + " (+ 4 minor) "*8], RAX" newLine)))
 
 (define cg-set-fvar
+  ;;(set! (fvar var) value)
+  ;; RAX = [|value|]
   (lambda (var)
-    (string-append)))
+    (string-append
+     tab "MOV qword [" (number->string (f-table-get var)) "], RAX" newLine)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
