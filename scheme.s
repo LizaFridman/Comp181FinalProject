@@ -202,7 +202,7 @@ sobVoid:
 	dq SOB_VOID
 
 	
-section .text			
+	section .text
 a:
 	nop
 	; setup a fake closure just to see how it prints:
@@ -610,6 +610,7 @@ write_sob_vector:
 	push qword [rax]
 	call write_sob
 	add rsp, 1*8
+	
 	pop rax
 	pop rcx
 	dec rcx

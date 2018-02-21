@@ -80,7 +80,33 @@
         (translate stringList)))))
 
 
+(define compile-scheme-file
+  (lambda (source dest)
+    (let* ((pipelined (list->sexprs (file->list source)))
+	   (size (length pipelined))
+	   (gen-c-table (set! c-table (master-build-c-table pipelined 1000)))
+	   (generated (map (lambda (expr)
+			     (string-append (code-gen expr)
+					    cg-print-rax))
+			   pipelined))
+	   (asm-code (fold-left string-append "" generated)))
+      (display (format "Compiled Scheme File with ~a parsed expressions!\n" size))
+      (list->file (string->list (string-append pre-text asm-code post-text)) dest))))
+
 ;--------------------------------------------------| cTable |--------------------------------------------------------
+
+(define T_UNDEFINED 0)
+(define T_VOID 1)
+(define T_NIL 2)
+(define T_INTEGER 3)
+(define T_FRACTION 4)
+(define T_BOOL 5)
+(define T_CHAR 6)
+(define T_STRING 7)
+(define T_SYMBOL 8)
+(define T_CLOSURE 9)
+(define T_PAIR 10)
+(define T_VECTOR 11)
 
 
 ;  is empty or not a list   -> returns saved results
@@ -90,29 +116,113 @@
 (define those-that-pass
   (lambda (exps test positive-results)
     (cond 
-          ((or (not (pair? exps)) (null? exps)) positive-results)
-          ((test (car exps)) (those-that-pass (cdr exps) test (cons (car exps) positive-results)))
-          ((pair? (car exps)) (those-that-pass `(,@(car exps) ,@(cdr exps)) test positive-results))
-          (else (those-that-pass (cdr exps) test positive-results)))))
+     ((or (not (pair? exps)) (null? exps)) positive-results)
+     ((test (car exps)) (those-that-pass (cdr exps) test (cons (car exps) positive-results)))
+     ((pair? (car exps)) (those-that-pass `(,@(car exps) ,@(cdr exps)) test positive-results))
+     (else (those-that-pass (cdr exps) test positive-results)))))
 
-; returns deep search, returns elements that pass test
+					; returns deep search, returns elements that pass test
+					; TODO: if exps passes test, do not go into the those-that-pass function
 (define ordered-those-that-pass
   (lambda (exps test)
     (reverse (those-that-pass exps test '()))))
 
+(define tagged-by-const
+  (lambda (exp)
+    (and (pair? exp) (equal? (car exp) 'const))))
+
+(define extract-consts
+  (lambda (exp)
+    (if (tagged-by-const exp)
+	(cdr exp)
+	(map (lambda (x) (cadr x))
+	     (ordered-those-that-pass exp tagged-by-const)))))
+
+					;(define extract-and-topo-sort-consts
+					;  (lambda (exp)
+					;    (map (lambda (x) (reverse (topological-sort x))) (extract-consts exp))
+					;    ))
+
+(define extract-and-topo-sort-consts
+  (lambda (exp done)
+    (if (null? exp) 
+      done
+      (extract-and-topo-sort-consts (cdr exp) (append done (reverse (topological-sort (car exp))))
+				    ))))
+
+(define master-const-extract 
+  (lambda (exp)
+    (extract-and-topo-sort-consts (extract-consts exp) '())))
 
 
-(define compile-scheme-file
-  (lambda (source dest)
-    (let* ((pipelined (list->sexprs (file->list source)))
-	   (size (length pipelined))
-	   (generated (map (lambda (expr)
-			     (string-append (code-gen expr)
-					    cg-print-rax))
-			   pipelined))
-	   (asm-code (fold-left string-append "" generated)))
-      (display (format "Compiled Scheme File with ~a parsed expressions!\n" size))
-      (list->file (string->list (string-append pre-text asm-code post-text)) dest))))
+
+(define add-to-c-table  ;returns (table . nextmem)
+  (lambda (table element mem)
+    (cond ((char? element) (cons (append table `((,mem ,element 
+						       (,T_CHAR ,(char->integer element))))) (+ 2 mem) ))
+          ((integer? element) (cons (append table `((,mem ,element
+							  (,T_INTEGER ,element)))) (+ 2 mem)))
+          ((rational? element) (cons (append table `((,mem ,element
+							   (,T_FRACTION ,(numerator element) ,(denominator element))))) (+ 3 mem)))
+          ((string? element) (cons (append table `((,mem ,element
+							 (,T_STRING ,(string-length element) ,(map char->integer (string->list element)))))) (+ mem (string-length element) 2))) 
+          ((symbol? element)
+           (let ((rep-str (symbol->string element)))
+             (if (c-table-contains? table rep-str)
+                 (cons (append table `((,mem ,element (,T_SYMBOL ,(c-table-contains? table rep-str))))) (+ 2 mem))
+                 (add-to-c-table (car (add-to-c-table table rep-str mem)) element (cdr (add-to-c-table table rep-str mem))))))
+          ((pair? element) (cons (append table `((,mem ,element 
+						       (,T_PAIR ,(c-table-contains? table (car element)) ,(c-table-contains? table (cdr element)))))) (+ 3 mem)))
+          ((vector? element) (cons (append table `((,mem ,element 
+							 (,T_VECTOR ,(vector-length element) ,(map (lambda (x) (c-table-contains? table x)) (vector->list element)))))) (+ mem (vector-length element) 2)))
+          (else 'error))))
+
+(define last-mem
+  (lambda (table starting-mem)
+    (if (null? table) starting-mem (caar (last-pair table)))))
+
+(define c-table-contains? ;returns adress
+  (lambda (table element)
+    (cond ((null? table) #f)
+          ((equal? element (cadar table)) (caar table))
+          (else (c-table-contains? (cdr table) element)))))
+
+(define build-c-table-func
+  (lambda (table lst mem)
+    (cond  ((null? lst) table)
+           ((c-table-contains? table (car lst)) (build-c-table-func table (cdr lst) mem))
+           (else
+	    (let*
+		((new-table (car (add-to-c-table table (car lst) mem))) (new-mem (cdr (add-to-c-table table (car lst) mem)))) (build-c-table-func new-table (cdr lst) new-mem))))))
+
+
+(define starting-table
+  (lambda (mem)
+    `((,mem ,(if #f #f) (,T_VOID)) (,(+ 1 mem) () (,T_NIL)) (,(+ mem 2) #f (,T_BOOL 0)) (,(+ mem 4) #t (,T_BOOL 1)))))
+
+
+(define build-c-table
+  (lambda (lst starting-mem)
+    (build-c-table-func (starting-table (- starting-mem 6)) lst starting-mem)))
+
+
+(define topological-sort 
+  (lambda (e) 
+    (cond 
+     ((or (number? e) (string? e) (eq? e (if #f #f)) (null? e) (boolean? e) (char? e) ) `(,e)) 
+      ((pair? e) 
+       `(,e ,@(topological-sort (car e)) ,@(topological-sort (cdr e))))
+      ((vector? e) 
+       `(,e ,@(apply append 
+                     (map topological-sort (vector->list e)))))
+      ((symbol? e)
+       `(,e ,@(topological-sort (symbol->string e))))
+      (else 'topological-sort-error))))
+
+(define master-build-c-table
+  (lambda (exp mem)
+    (build-c-table (master-const-extract exp) mem)))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  C-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -121,17 +231,6 @@
 
 ;;Gets a const in the table and returns its ADDRESS
 ;;a.k.a:  c-table[i] = <Memory-Index, Value, (Type, Type-Data)>
-(define c-table-contains?
-  (lambda (const ct)
-    (cond ((null? ct)
-	   ;;#f
-	   0)
-	  ;;c-table[i] == const
-	  ((equal? const (second (car ct)))
-	   (first (car ct)))
-	  (else
-	   (c-table-contains? (cdr ct) const)))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  F-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -141,8 +240,7 @@
   (lambda (var ft)
     (let ((row (first ft)))
       (cond ((null? ft)
-	     ;;#f
-	   0)
+	     #f)
 	    ((equal? var (first row))
 	     (second row))
 	    (else (f-table-contains? var (cdr ft)))))))
@@ -164,7 +262,7 @@
   (lambda (pe)
     ;; After each generation, the value of the generated code is in RAX
     ;; Returns string
-    ;; (display (format "Code Gen to ~a\n" pe))
+    (display (format "Code Gen to ~a\n" pe))
     (string-append ";" (format "~a" pe) newLine
 		   (cond ((tag? 'const pe)
 			  (cg-const (second pe)))
@@ -221,7 +319,7 @@
 						 ((tag? 'fvar var)
 						  (cg-set-fvar (cdr var)))
 						 (else "Undefined variable type"))
-					   tab "MOV RAX, sobVoid" newLine)))
+					   tab "MOV RAX, qword [sobVoid]" newLine)))
 			 
 			 ((tag? 'box pe))
 			 
@@ -251,10 +349,10 @@
 
 (define cg-const
   (lambda (const)
-    ;;(number->string const)
-    (let ((value (number->string (c-table-contains? const c-table))))
+    (let ((address (number->string (c-table-contains? c-table const))))
+      (display (format "address of ~a is ~b\n" const address))
       (string-append
-       tab "MOV RAX, " value newLine)
+       tab "MOV RAX, " address newLine)
       )))
 
 
@@ -269,7 +367,7 @@
 	    (else
 	     (let ((cg-i (code-gen (first lst))))
 	       (string-append cg-i newLine
-			      tab "CMP RAX, sobFalse" newLine
+			      tab "CMP RAX, qword [sobFalse]" newLine
 			      tab "JNE " end-label newLine
 			      (cg-or (cdr lst) end-label)))))))
 
@@ -304,7 +402,7 @@
 	  (l-end (make-label "L_ifEnd")))
       
       (string-append test-cg newLine
-		     tab "MOV RBX, sobFalse" newLine
+		     tab "MOV RBX, qword [sobFalse]" newLine
 		     tab "CMP RAX, RBX" newLine
 		     tab "JE " l-dif newLine
 		     dit-cg newLine
@@ -349,7 +447,7 @@
     (let ((address (number->string (f-table-get var f-table))))
     (string-append (code-gen value) newLine
 		   tab "MOV qword [" address "], RAX" newLine
-		   tab "MOV RAX, sobVoid" newLine))))
+		   tab "MOV RAX, qword [sobVoid]" newLine))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
