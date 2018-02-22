@@ -253,7 +253,83 @@
 		    c-table)
 	       "")))
 
- 
+ (define code-gen-void
+  (lambda ()
+    (string-append
+     tab "dq SOB_VOID" nl)))
+
+(define code-gen-nil
+  (lambda ()
+    (string-append
+     tab "dq SOB_NIL" nl)))
+
+(define code-gen-boolean
+  (lambda (value)
+    (if (equal? value 0)
+    (string-append
+     tab "dq SOB_TRUE" nl)
+    (string-append
+      tab "dq SOB_FALSE" nl))))
+
+(define code-gen-char
+  (lambda (value)
+    (string-append
+     tab "dq MAKE_LITERAL(T_CHAR," (number->string value) ")" nl)))
+
+(define code-gen-integer
+  (lambda (value)
+    (string-append
+     tab "PUSH(IMM(" (number->string value) "));" nl
+     tab "CALL(MAKE_SOB_INTEGER);" nl
+     tab "DROP(1);" nl)))
+
+(define code-gen-fraction
+  (lambda (num denum)
+    (string-append
+     tab "MAKE_LITERAL_FRACTION(" num ", " denum ")" nl)))
+
+(define code-gen-string
+  (lambda (length chars)
+    (let ((chars (fold-left (lambda (acc current)
+                              (string-append acc tab "PUSH(IMM(" (number->string current) "));" nl))
+                            ""
+                            chars)))
+      (string-append
+       chars
+       tab "PUSH(IMM(" (number->string length) "));" nl
+       tab "CALL(MAKE_SOB_STRING);" nl
+       tab "POP(R1);" nl
+       tab "DROP(R1);" nl))))
+
+(define code-gen-symbol
+  (lambda (str-add)
+    (string-append
+     tab "PUSH(IMM(" (number->string str-add) "));" nl
+     tab "CALL(MAKE_SOB_SYMBOL);" nl
+     tab "DROP(1);" nl)))
+
+(define code-gen-pair
+  (lambda (car cdr)
+    (string-append
+     tab "PUSH(IMM(" (number->string cdr) "));" nl
+     tab "PUSH(IMM(" (number->string car) "));" nl
+     tab "CALL(MAKE_SOB_PAIR);" nl
+     tab "DROP(2);" nl)))
+
+(define code-gen-vector
+  (lambda (length items)
+    (let ((items (fold-left (lambda (acc current)
+                              (string-append acc tab "PUSH(IMM(" (number->string current) "));" nl))
+                            ""
+                            items)))
+      (string-append
+       items
+       tab "PUSH(IMM(" (number->string length) "));" nl
+       tab "CALL(MAKE_SOB_VECTOR);" nl
+       tab "POP(R1);" nl
+       tab "DROP(IND(R1));" nl))))
+
+	   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  F-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;row = <Var-name, Index>

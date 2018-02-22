@@ -47,6 +47,8 @@
 
 %define MAKE_LITERAL_PAIR(car, cdr) (((((car - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (cdr - start_of_data)) << TYPE_BITS) | T_PAIR)
 
+%define MAKE_LITERAL_FRACTION(top, bottom) (((((top - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (bottom - start_of_data)) << TYPE_BITS) | T_FRACTION)
+
 %macro CAR 1
 	DATA_UPPER %1
 	add %1, start_of_data
