@@ -302,38 +302,38 @@
                             chars)))
       (string-append
        chars
-       tab "PUSH(IMM(" (number->string length) "));" nl
-       tab "CALL(MAKE_SOB_STRING);" nl
-       tab "POP(R1);" nl
-       tab "DROP(R1);" nl))))
+       tab "PUSH(IMM(" (number->string length) "));" newLine
+       tab "CALL(MAKE_SOB_STRING);" newLine
+       tab "POP(R1);" newLine
+       tab "DROP(R1);" newLine))))
 
 (define cg-T-symbol
   (lambda (str-add)
     (string-append
-     tab "PUSH(IMM(" (number->string str-add) "));" nl
-     tab "CALL(MAKE_SOB_SYMBOL);" nl
-     tab "DROP(1);" nl)))
+     tab "PUSH(IMM(" (number->string str-add) "));" newLine
+     tab "CALL(MAKE_SOB_SYMBOL);" newLine
+     tab "DROP(1);" newLine)))
 
 (define cg-T-pair
   (lambda (car cdr)
     (string-append
-     tab "PUSH(IMM(" (number->string cdr) "));" nl
-     tab "PUSH(IMM(" (number->string car) "));" nl
-     tab "CALL(MAKE_SOB_PAIR);" nl
-     tab "DROP(2);" nl)))
+     tab "PUSH(IMM(" (number->string cdr) "));" newLine
+     tab "PUSH(IMM(" (number->string car) "));" newLine
+     tab "CALL(MAKE_SOB_PAIR);" newLine
+     tab "DROP(2);" newLine)))
 
 (define cg-T-vector
   (lambda (length items)
     (let ((items (fold-left (lambda (acc current)
-                              (string-append acc tab "PUSH(IMM(" (number->string current) "));" nl))
+                              (string-append acc tab "PUSH(IMM(" (number->string current) "));" newLine))
                             ""
                             items)))
       (string-append
        items
-       tab "PUSH(IMM(" (number->string length) "));" nl
-       tab "CALL(MAKE_SOB_VECTOR);" nl
-       tab "POP(R1);" nl
-       tab "DROP(IND(R1));" nl))))
+       tab "PUSH(IMM(" (number->string length) "));" newLine
+       tab "CALL(MAKE_SOB_VECTOR);" newLine
+       tab "POP(R1);" newLine
+       tab "DROP(IND(R1));" newLine))))
 
 	   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  F-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
