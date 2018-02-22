@@ -200,7 +200,6 @@ sobFalse:
 	dq SOB_FALSE
 sobVoid:
 	dq SOB_VOID
-
 	
 	section .text
 a:
@@ -215,7 +214,9 @@ a:
 	mov qword [sob6 + 8], a
 
 	; printing the fake closure:	
-	push qword [sob6]
+	
+
+  	push qword [sob6]
 	call write_sob_if_not_void
 	add rsp, 1*8
 

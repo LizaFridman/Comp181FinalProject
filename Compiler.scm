@@ -223,15 +223,34 @@
   (lambda (exp mem)
     (build-c-table (master-const-extract exp) mem)))
 
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  C-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+;;a.k.a:  c-table[i] =
 (define c-table '())
 
-;;Gets a const in the table and returns its ADDRESS
-;;a.k.a:  c-table[i] = <Memory-Index, Value, (Type, Type-Data)>
+(define cg-c-table
+  (lambda ()
+    (fold-left string-append
+	       (map (lambda (row)
+		      ;; Row = <Index, Value, (Type, Type-Data)>
+		      (let* ((data (third row))
+			     (type (first data))
+			     (type-data (second data)))
+			(cond
+			 ((equal? T_VOID type))
+			 ((equal? T_NIL type))
+			 ((equal? T_INTEGER type))
+			 ((equal? T_FRACTION type))
+			 ((equal? T_BOOL type))
+			 ((equal? T_CHAR type))
+			 ((equal? T_STRING type))
+			 ((equal? T_SYMBOL type))
+			 ((equal? T_CLOSURE type))
+			 ((euqal? T_PAIR type))
+			 ((equal? T_VECTOR type))
+			 (else (number->string T_UNDEFINED)))))
+		    c-table)
+	       "")))
 
+ 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  F-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define f-table '())
@@ -262,7 +281,7 @@
   (lambda (pe)
     ;; After each generation, the value of the generated code is in RAX
     ;; Returns string
-    (display (format "Code Gen to ~a\n" pe))
+    ;;(display (format "Code Gen to ~a\n" pe))
     (string-append ";" (format "~a" pe) newLine
 		   (cond ((tag? 'const pe)
 			  (cg-const (second pe)))
@@ -344,15 +363,15 @@
 
 (define cg-print-rax
     (string-append
-     tab "PUSH RAX" newLine
+     tab "PUSH [RAX]" newLine
      tab "call write_sob_if_not_void" newLine))
 
 (define cg-const
   (lambda (const)
-    (let ((address (number->string (c-table-contains? c-table const))))
-      (display (format "address of ~a is ~b\n" const address))
+    (let ((index (number->string (c-table-contains? c-table const))))
+      ;;(display (format "address of ~a is ~b\n" const address))
       (string-append
-       tab "MOV RAX, " address newLine)
+       tab "MOV RAX, const" index newLine)
       )))
 
 
@@ -486,13 +505,26 @@
 		       ))
 
 (define pre-text (string-append
+		  param-get-def
+		  newLine
 		  "section .bss" newLine
 		  "extern write_sob, write_sob_if_not_void, sobTrue, sobFalse, start_of_data" newLine
 		  "global main" newLine
-		  param-get-def 
+		  newLine
 		  "section .text" newLine
 		  newLine
 		  "main:" newLine))
+
+(define p-format "%d")
+
+(define print-register
+  (let ((l-print "print_register"))
+    (string-append "%macro " l-print " 2" newLine
+		   tab "MOV rdi, %2" newLine
+		   tab "MOVzx rsi, %1" newLine
+		   tab "call printf" newLine
+		   "%endmacro" newLine
+     )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Post-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -500,5 +532,6 @@
 
 (define post-text (string-append newLine
 				 l-exit ":" newLine
-				 tab "PUSH RAX" newLine
-				 tab "call write_sob" newLine))
+				 ;;tab "PUSH RAX" newLine
+				 ;;tab "call write_sob" newLine
+				 ))
