@@ -85,6 +85,7 @@
     (let* ((pipelined (list->sexprs (file->list source)))
 	   (size (length pipelined))
 	   (gen-c-table (set! c-table (master-build-c-table pipelined 1000)))
+	   (gen-f-table (set! f-table (build-f-table pipelined '() 0)))
 	   (generated (map (lambda (expr)
 			     (string-append (code-gen expr)
 					    cg-print-rax))
@@ -225,6 +226,8 @@
 
 ;;a.k.a:  c-table[i] =
 (define c-table '())
+(define const-label "L_const")
+(define fvar-label "L_global")
 
 (define cg-c-table
   (lambda ()
@@ -253,6 +256,7 @@
  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  F-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;row = <Var-name, Index>
 (define f-table '())
 
 (define f-table-contains?
@@ -264,11 +268,30 @@
 	     (second row))
 	    (else (f-table-contains? var (cdr ft)))))))
 
-;; TODO: Check if this is the same as contains?
-(define f-table-get
-  ;; Returns the memory address of the var
-  (lambda (var)
-    (second (assoc var f-table))))
+;; Returns a list of all fvar-values
+(define extract-fvars
+  (lambda (pe)
+    (cond ((not (pair? pe))
+	   '())
+	  ((tag? 'fvar pe)
+	   (cdr pe))
+	  (else
+	   `(,@(extract-fvars (first pe)) ,@(extract-fvars (cdr pe)))))))
+
+(define build-f-table
+  (lambda (pe ft index)
+    (add-to-f-table (remove-duplicates (extract-fvars pe)) ft index)))
+
+(define add-to-f-table
+  (lambda (vars ft index)
+      (cond ((null? vars)
+	     ft)
+	    ((f-table-contains? (first vars) ft)
+	     (add-to-f-table (cdr vars) ft index))
+	    (else
+	     (add-to-f-table (cdr vars)
+			     `(,@ft `(,(first vars) ,index))
+			     (+ index 1))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Code Generation  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -363,15 +386,16 @@
 
 (define cg-print-rax
     (string-append
-     tab "PUSH [RAX]" newLine
-     tab "call write_sob_if_not_void" newLine))
+     tab "PUSH qword [RAX]" newLine
+     tab "call write_sob_if_not_void" newLine
+     tab "ADD rsp, 1*8" newLine))
 
 (define cg-const
   (lambda (const)
     (let ((index (number->string (c-table-contains? c-table const))))
       ;;(display (format "address of ~a is ~b\n" const address))
       (string-append
-       tab "MOV RAX, const" index newLine)
+       tab "MOV RAX, sobInt" (number->string const) newLine);;const-label index newLine)
       )))
 
 
@@ -458,7 +482,7 @@
   ;; RAX = [|value|]
   (lambda (var)
     (string-append
-     tab "MOV qword [" (number->string (f-table-get var)) "], RAX" newLine)))
+     tab "MOV qword [" (number->string (f-table-contains? var f-table)) "], RAX" newLine)))
 
 
 (define cg-define
@@ -505,11 +529,14 @@
 		       ))
 
 (define pre-text (string-append
-		  param-get-def
+		  "%include \"scheme.s\"" newLine
+		  ;; param-get-def
 		  newLine
 		  "section .bss" newLine
-		  "extern write_sob, write_sob_if_not_void, sobTrue, sobFalse, start_of_data" newLine
 		  "global main" newLine
+		  newLine
+		  "section .data" newLine
+		  "start_of_data:" newLine
 		  newLine
 		  "section .text" newLine
 		  newLine
@@ -534,4 +561,5 @@
 				 l-exit ":" newLine
 				 ;;tab "PUSH RAX" newLine
 				 ;;tab "call write_sob" newLine
+				 tab "ret" newLine
 				 ))

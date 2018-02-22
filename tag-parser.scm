@@ -171,13 +171,13 @@
   (^quote? 'quasiquote))
   
 (define remove-duplicates
-  (lambda (list)
-    (if (null? list)
+  (lambda (lst)
+    (if (null? lst)
       '()
-      (cons (car list)
+      (cons (car lst)
             (remove-duplicates (filter (lambda (mem)
-                                        (not (eq? mem (car list))))
-                                       (cdr list)))))))
+                                        (not (equal? mem (car lst))))
+                                       (cdr lst)))))))
 
 (define remove-dup-sets
   (lambda (pair-list)

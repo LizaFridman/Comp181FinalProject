@@ -151,7 +151,7 @@ extern exit, printf, scanf
 global write_sob, write_sob_if_not_void, start_of_data, sobTrue, sobFalse, sobVoid
 	
 section .data
-start_of_data:
+
 sobNil:
 	dq SOB_NIL
 sobInt3:
