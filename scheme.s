@@ -157,83 +157,82 @@
 
 section .bss
 
-extern exit, printf, scanf
-global write_sob, write_sob_if_not_void, start_of_data, sobTrue, sobFalse, sobVoid
+extern exit, printf, scanf;global write_sob, write_sob_if_not_void, start_of_data, sobTrue, sobFalse, sobVoid
 	
 section .data
 
-sobInt3:
-	dq MAKE_LITERAL(T_INTEGER, 3)
-sobInt2:
-	dq MAKE_LITERAL(T_INTEGER, 2)
-sobInt1:
-	dq MAKE_LITERAL(T_INTEGER, 1)
-sobPair3N:
-	dq MAKE_LITERAL_PAIR(sobInt3, sobNil)
-sobPair23N:
-	dq MAKE_LITERAL_PAIR(sobInt2, sobPair3N)
-sobPair123N:
-	dq MAKE_LITERAL_PAIR(sobInt1, sobPair23N)
-sobPair12:
-	dq MAKE_LITERAL_PAIR(sobInt1, sobInt2)
-sobPairA:
-	dq MAKE_LITERAL_PAIR(sobPair12, sobNil)
-sobPairB:
-	dq MAKE_LITERAL_PAIR(sobPair123N, sobPairA)
-sobPairC:
-	dq MAKE_LITERAL_PAIR(sobInt3, sobPair12)
-sobPairNN:
-	dq MAKE_LITERAL_PAIR(sobNil, sobNil)
-sob1:
-	dq MAKE_LITERAL_PAIR(sobInt1, sobPairNN)
-sob2:
-	dq MAKE_LITERAL_PAIR(sobInt2, sob1)
-sob3:
-	dq MAKE_LITERAL_PAIR(sob2, sob2)
-sob4:
-	dq MAKE_LITERAL_PAIR(sobInt1, sobNil)
-sob5:
-	dq MAKE_LITERAL_PAIR(sob4, sobNil)
-sob6:
-	dq 0, 0 		; closure: wait for later!
-sob7:
-	MAKE_LITERAL_STRING "Mayer", CHAR_NEWLINE, "Goldberg", CHAR_TAB, "<=="
-sob8:
-	dq MAKE_LITERAL_PAIR(sob7, sobPairB)
-sobVec1:
-	MAKE_LITERAL_VECTOR sob8, sob7, sobInt1, sobInt2, sobInt3, sob4 
+;sobInt3:			
+;	dq MAKE_LITERAL(T_INTEGER, 3)
+;sobInt2:
+;	dq MAKE_LITERAL(T_INTEGER, 2)
+;sobInt1:
+;	dq MAKE_LITERAL(T_INTEGER, 1)
+;sobPair3N:
+;	dq MAKE_LITERAL_PAIR(sobInt3, sobNil)
+;sobPair23N:
+;	dq MAKE_LITERAL_PAIR(sobInt2, sobPair3N)
+;sobPair123N:
+;	dq MAKE_LITERAL_PAIR(sobInt1, sobPair23N)
+;sobPair12:
+;	dq MAKE_LITERAL_PAIR(sobInt1, sobInt2)
+;sobPairA:
+;	dq MAKE_LITERAL_PAIR(sobPair12, sobNil)
+;sobPairB:
+;	dq MAKE_LITERAL_PAIR(sobPair123N, sobPairA)
+;sobPairC:
+;	dq MAKE_LITERAL_PAIR(sobInt3, sobPair12)
+;sobPairNN:
+;	dq MAKE_LITERAL_PAIR(sobNil, sobNil)
+;sob1:
+;	dq MAKE_LITERAL_PAIR(sobInt1, sobPairNN)
+;sob2:
+;	dq MAKE_LITERAL_PAIR(sobInt2, sob1)
+;sob3:
+;	dq MAKE_LITERAL_PAIR(sob2, sob2)
+;sob4:
+;	dq MAKE_LITERAL_PAIR(sobInt1, sobNil)
+;sob5:
+;	dq MAKE_LITERAL_PAIR(sob4, sobNil)
+;sob6:
+;	dq 0, 0 		; closure: wait for later!
+;sob7:
+;	MAKE_LITERAL_STRING "Mayer", CHAR_NEWLINE, "Goldberg", CHAR_TAB, "<=="
+;sob8:
+;	dq MAKE_LITERAL_PAIR(sob7, sobPairB)
+;sobVec1:
+;	MAKE_LITERAL_VECTOR sob8, sob7, sobInt1, sobInt2, sobInt3, sob4 
 
 	
 	section .text
-a:
-	nop
-	; setup a fake closure just to see how it prints:
-	mov rax, 0x1234
-	sal rax, 30
-	or rax, sob6 + 8 - start_of_data
-	sal rax, 4
-	or rax, T_CLOSURE
-	mov qword [sob6], rax
-	mov qword [sob6 + 8], a
+;a:				
+;	nop
+;	; setup a fake closure just to see how it prints:
+;	mov rax, 0x1234
+;	sal rax, 30
+;	or rax, sob6 + 8 - start_of_data
+;	sal rax, 4
+;	or rax, T_CLOSURE
+;	mov qword [sob6], rax
+;	mov qword [sob6 + 8], a
 
 	; printing the fake closure:	
 	
 
-  	push qword [sob6]
-	call write_sob_if_not_void
-	add rsp, 1*8
+;  	push qword [sob6]
+;	call write_sob_if_not_void
+;	add rsp, 1*8
 
 	; printing a vector:
-	push qword [sobVec1]
-	call write_sob_if_not_void
-	add rsp, 1*8
+;	push qword [sobVec1]
+;	call write_sob_if_not_void
+;	add rsp, 1*8
 
 	; will void print??
-	push qword SOB_VOID
-	call write_sob_if_not_void
-	add rsp, 1*8
+;	push qword SOB_VOID
+;	call write_sob_if_not_void
+;	add rsp, 1*8
 	
-	ret
+;	ret
 
 write_sob_undefined:
 	push rbp
@@ -641,8 +640,88 @@ write_sob_symbol:
 	push rbp
 	mov rbp, rsp
 
+	mov rax, qword [rbp + 8 + 1*8]
+	mov rcx, rax
+	STRING_LENGTH rcx
+	STRING_ELEMENTS rax
+
+.loop:
+	cmp rcx, 0
+	je .done
+	mov bl, byte [rax]
+	and rbx, 0xff
+
+	cmp rbx, CHAR_TAB
+	je .ch_tab
+	cmp rbx, CHAR_NEWLINE
+	je .ch_newline
+	cmp rbx, CHAR_PAGE
+	je .ch_page
+	cmp rbx, CHAR_RETURN
+	je .ch_return
+	cmp rbx, CHAR_SPACE
+	jl .ch_hex
+	
+	mov rdi, .fs_simple_char
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_hex:
+	mov rdi, .fs_hex_char
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_tab:
+	mov rdi, .fs_tab
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_page:
+	mov rdi, .fs_page
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_return:
+	mov rdi, .fs_return
+	mov rsi, rbx
+	jmp .printf
+
+.ch_newline:
+	mov rdi, .fs_newline
+	mov rsi, rbx
+
+.printf:
+	push rax
+	push rcx
+	mov rax, 0
+	call printf
+	pop rcx
+	pop rax
+.printfEnd:
+	dec rcx	
+	inc rax
+	jmp .loop
+
+.done:
 	leave
 	ret
+
+section .data
+	
+.double_quote:
+	db '\"', 0
+.fs_simple_char:
+	db "%c", 0
+.fs_hex_char:
+	db "\x%02x;", 0	
+.fs_tab:
+	db "\t", 0
+.fs_page:
+	db "\f", 0
+.fs_return:
+	db "\r", 0
+.fs_newline:
+	db "\n", 0
 	
 write_sob_fraction:
 	push rbp
@@ -669,6 +748,7 @@ section .data
 .closure:
 	db "#<closure [env:%p, code:%p]>", 0
 
+section .text
 write_sob:
 	mov rax, qword [rsp + 1*8]
 	TYPE rax

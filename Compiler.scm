@@ -83,9 +83,7 @@
   (lambda (sexprs)
     (fold-left string-append
 	       ""
-	       (map (lambda (expr)
-		      (string-append (code-gen expr)
-				     cg-print-rax))
+	       (map code-gen
 		    sexprs))))
 
 (define compile-scheme-file
@@ -539,28 +537,22 @@
    tab "call write_sob_if_not_void" newLine
    tab "ADD rsp, 1*8" newLine))
 
-(define cg-print*
-  (string-append
-   tab "MOV RAX"
-   tab "PUSH qword [RAX]" newLine
-   tab "call write_sob_if_not_void" newLine
-   tab "ADD rsp, 1*8" newLine))
-
 (define cg-const
   (lambda (const)
     (let* ((row (c-table-getLine c-table const))
 	   (index (first row))
 	   (type (first (third row))))
       (string-append ".t_" const-label (number->string index) ":" newLine
-		     tab "MOV RAX, " const-label (number->string index) newLine
+		     tab "MOV RAX, " const-label (number->string index)  newLine
 		     ;;(if (equal? T_SYMBOL type)
-			;; (string-append
-			  ;;tab "MOV RAX, [RAX]" newLine
-			  ;;tab "MOV RAX, [RAX]" newLine
-		;;	  tab "DATA RAX" newLine
-			  ;;tab "MOV RAX,[RAX]" newLine
-		     ;;)
-			 newLine))))
+		     ;; (string-append
+		     ;;tab "MOV RAX, [RAX]" newLine
+		     ;;tab "MOV RAX, [RAX]" newLine
+		     ;;tab "DATA RAX" newLine
+		     ;;tab "MOV RAX,[RAX]" newLine)
+		     newLine
+		     cg-print-rax
+		     newLine))))
 
 
 (define cg-or

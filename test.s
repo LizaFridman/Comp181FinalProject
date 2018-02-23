@@ -33,6 +33,7 @@ main:
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8
+
 ;(const a)
 .t_L_const11:
 	MOV RAX, L_const11
@@ -40,6 +41,7 @@ main:
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8
+
 ;(const Hello)
 .t_L_const13:
 	MOV RAX, L_const13
@@ -47,5 +49,6 @@ main:
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8
+
 L_exit:
 	ret
