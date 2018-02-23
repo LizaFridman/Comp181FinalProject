@@ -653,14 +653,14 @@ write_sob_symbol:
 	mov rbp, rsp
 
 	mov rax, qword [rbp + 8 + 1*8]
+
 	mov rcx, rax
 	STRING_LENGTH rcx
 	STRING_ELEMENTS rax
-
+	
 .loop:
 	cmp rcx, 0
 	je .done
-	mov r8, rax
 	
 	mov bl, byte [rax]
 	and rbx, 0xff
