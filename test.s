@@ -19,28 +19,31 @@ L_const6:
 L_const8:
 	MAKE_LITERAL_STRING 97
 L_const11:
-	dq MAKE_LITERAL_SYMBOL(L_const8)
+	MAKE_LITERAL_SYMBOL L_const8
 L_const13:
 	MAKE_LITERAL_STRING 72, 101, 108, 108, 111
 section .text
 
 main:
+
 ;(const 1)
 .t_L_const6:
 	MOV RAX, L_const6
+
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8
 ;(const a)
 .t_L_const11:
 	MOV RAX, L_const11
-	DATA RAX
+
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8
 ;(const Hello)
 .t_L_const13:
 	MOV RAX, L_const13
+
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8

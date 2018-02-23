@@ -45,8 +45,6 @@
 	DATA_UPPER %1
 %endmacro
 
-%define MAKE_LITERAL_SYMBOL(stringAddress) ((stringAddress - start_of_data) << TYPE_BITS | T_SYMBOL)
-
 %define MAKE_LITERAL_PAIR(car, cdr) (((((car - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (cdr - start_of_data)) << TYPE_BITS) | T_PAIR)
 
 %define MAKE_LITERAL_FRACTION(top, bottom) (((((top - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (bottom - start_of_data)) << TYPE_BITS) | T_FRACTION)
@@ -97,6 +95,14 @@
 	%%LstrEnd:
 %endmacro
 
+%macro MAKE_LITERAL_SYMBOL 1+
+	dq (((((%%LstrEnd - %%Lstr) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (%%Lstr - start_of_data)) << TYPE_BITS) | T_SYMBOL)
+	%%Lstr:
+	dq %1
+	%%LstrEnd:		
+%endmacro
+	
+	
 %macro STRING_LENGTH 1
 	DATA_UPPER %1
 %endmacro

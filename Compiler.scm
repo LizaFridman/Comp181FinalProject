@@ -101,6 +101,7 @@
 	    (code (create-code-to-run pipelined)))
 	;;(display (format "Generated:\n~a\nCode:\n~b\n" gen code))
 	(list->file (string->list (string-append pre
+						 newLine
 						 code
 						 post-text))
 		  dest)
@@ -366,14 +367,14 @@
 
 (define append-params
   (lambda (params)
-  (fold-left (lambda (result current)
-	       (string-append result
-			      (if (not (equal? current (first params)))
-				  ", "
-				  " ")
-			      (number->string current)))
-	     ""
-	     params)))
+    (fold-left (lambda (result current)
+		 (string-append result
+				(if (not (equal? current (first params)))
+				    ", "
+				    " ")
+				(number->string current)))
+	       ""
+	       params)))
 
 (define cg-T-string
   (lambda (length chars index)
@@ -384,8 +385,11 @@
 
 (define cg-T-symbol
   (lambda (stringIndex index)
-    (string-append (make-const-label index)
-		   tab "dq MAKE_LITERAL_SYMBOL(" const-label (number->string stringIndex) ")" newLine)))
+      (string-append (make-const-label index)
+		     tab "MAKE_LITERAL_SYMBOL " (string-append
+						const-label
+						(number->string stringIndex))
+		     newLine)))
 
 (define cg-T-pair
   (lambda (carIndex cdrIndex index)
@@ -397,7 +401,7 @@
     (string-append
      (make-const-label index)
      tab "MAKE_LITERAL_VECTOR " (append-params items) newLine)))
-	   
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  F-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;row = <Var-name, Index>
@@ -549,14 +553,14 @@
 	   (type (first (third row))))
       (string-append ".t_" const-label (number->string index) ":" newLine
 		     tab "MOV RAX, " const-label (number->string index) newLine
-		     (if (equal? T_SYMBOL type)
-			 (string-append
+		     ;;(if (equal? T_SYMBOL type)
+			;; (string-append
 			  ;;tab "MOV RAX, [RAX]" newLine
 			  ;;tab "MOV RAX, [RAX]" newLine
-			  tab "DATA RAX" newLine
+		;;	  tab "DATA RAX" newLine
 			  ;;tab "MOV RAX,[RAX]" newLine
-			  )
-			 "")))))
+		     ;;)
+			 newLine))))
 
 
 (define cg-or
