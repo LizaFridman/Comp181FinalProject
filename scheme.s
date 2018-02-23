@@ -344,7 +344,7 @@ section .data
 .nul:
 	db "#\nul", 0
 .special:
-	db "#\x%02x", 0
+	db "#\x%01x", 0
 .regular:
 	db "#\%c", 0
 
@@ -482,13 +482,15 @@ write_sob_string:
 
 	leave
 	ret
+	
 section .data
+	
 .double_quote:
-	db '"', 0
+	db '\"', 0
 .fs_simple_char:
 	db "%c", 0
 .fs_hex_char:
-	db "\x%02x;", 0	
+	db "\x%01x;", 0	
 .fs_tab:
 	db "\t", 0
 .fs_page:
@@ -498,6 +500,8 @@ section .data
 .fs_newline:
 	db "\n", 0
 
+section .text
+	
 write_sob_pair:
 	push rbp
 	mov rbp, rsp
@@ -523,10 +527,13 @@ write_sob_pair:
 	ret
 
 section .data
+	
 .open_paren:
 	db "(", 0
 .close_paren:
 	db ")", 0
+
+section .text
 
 write_sob_pair_on_cdr:
 	push rbp
@@ -571,6 +578,8 @@ section .data
 .dot:
 	db " . ", 0
 
+section .text
+	
 write_sob_vector:
 	push rbp
 	mov rbp, rsp
@@ -629,6 +638,7 @@ write_sob_vector:
 	ret
 
 section	.data
+	
 .fs_open_vector:
 	db "#(", 0
 .fs_close_vector:
@@ -636,6 +646,8 @@ section	.data
 .fs_space:
 	db " ", 0
 
+section .text
+	
 write_sob_symbol:
 	push rbp
 	mov rbp, rsp
@@ -648,6 +660,8 @@ write_sob_symbol:
 .loop:
 	cmp rcx, 0
 	je .done
+	mov r8, rax
+	
 	mov bl, byte [rax]
 	and rbx, 0xff
 
@@ -697,8 +711,9 @@ write_sob_symbol:
 	call printf
 	pop rcx
 	pop rax
+	
 .printfEnd:
-	dec rcx	
+	dec rcx
 	inc rax
 	jmp .loop
 
@@ -708,12 +723,10 @@ write_sob_symbol:
 
 section .data
 	
-.double_quote:
-	db '\"', 0
 .fs_simple_char:
 	db "%c", 0
 .fs_hex_char:
-	db "\x%02x;", 0	
+	db "\x%01x;", 0	
 .fs_tab:
 	db "\t", 0
 .fs_page:
