@@ -79,20 +79,32 @@
                            (lambda (msg) `(error ,@msg))))))
         (translate stringList)))))
 
+(define create-code-to-run
+  (lambda (sexprs)
+    (fold-left string-append
+	       ""
+	       (map (lambda (expr)
+		      (string-append (code-gen expr)
+				     cg-print-rax))
+		    sexprs))))
 
 (define compile-scheme-file
   (lambda (source dest)
     (let* ((pipelined (list->sexprs (file->list source)))
-	   (size (length pipelined))
-	   (gen-c-table (set! c-table (master-build-c-table pipelined 1000)))
-	   (gen-f-table (set! f-table (build-f-table pipelined '() 0)))
-	   (generated (map (lambda (expr)
-			     (string-append (code-gen expr)
-					    cg-print-rax))
-			   pipelined))
-	   (asm-code (fold-left string-append "" generated)))
-      (display (format "Compiled Scheme File with ~a parsed expressions!\n" size))
-      (list->file (string->list (string-append pre-text asm-code post-text)) dest))))
+	   (size (length pipelined)))
+      ;;(display (format "Before c-table...\n"))
+      (set! c-table (master-build-c-table pipelined 6))
+      ;;(display (format "C-Table:\n~a\n" c-table))
+      ;;(set! f-table (build-f-table pipelined '() 0))
+      ;;(display (format "F-Table:\n~a\n" f-table))
+      (let* ((pre (generate-pre-text c-table))
+	    (code (create-code-to-run pipelined)))
+	;;(display (format "Generated:\n~a\nCode:\n~b\n" gen code))
+	(list->file (string->list (string-append pre
+						 code
+						 post-text))
+		  dest)
+      (display (format "Compiled Scheme file with ~a parsed expressions!\n" size))))))
 
 ;--------------------------------------------------| cTable |--------------------------------------------------------
 
@@ -117,9 +129,15 @@
 (define those-that-pass
   (lambda (exps test positive-results)
     (cond 
-     ((or (not (pair? exps)) (null? exps)) positive-results)
-     ((test (car exps)) (those-that-pass (cdr exps) test (cons (car exps) positive-results)))
+     ((or (not (pair? exps))
+	  (null? exps))
+      positive-results)
+     
+     ((test (car exps))
+      (those-that-pass (cdr exps) test (cons (car exps) positive-results)))
+     
      ((pair? (car exps)) (those-that-pass `(,@(car exps) ,@(cdr exps)) test positive-results))
+     
      (else (those-that-pass (cdr exps) test positive-results)))))
 
 					; returns deep search, returns elements that pass test
@@ -153,29 +171,60 @@
 
 (define master-const-extract 
   (lambda (exp)
-    (extract-and-topo-sort-consts (extract-consts exp) '())))
+    (if (null? exp)
+	'()
+	(extract-and-topo-sort-consts (extract-consts exp) '()))))
 
 
 
 (define add-to-c-table  ;returns (table . nextmem)
   (lambda (table element mem)
-    (cond ((char? element) (cons (append table `((,mem ,element 
-						       (,T_CHAR ,(char->integer element))))) (+ 2 mem) ))
-          ((integer? element) (cons (append table `((,mem ,element
-							  (,T_INTEGER ,element)))) (+ 2 mem)))
-          ((rational? element) (cons (append table `((,mem ,element
-							   (,T_FRACTION ,(numerator element) ,(denominator element))))) (+ 3 mem)))
-          ((string? element) (cons (append table `((,mem ,element
-							 (,T_STRING ,(string-length element) ,(map char->integer (string->list element)))))) (+ mem (string-length element) 2))) 
+    (cond ((char? element)
+	   ;; T_Char <index, value, (T_Char, value)>
+	   (cons (append table
+			 `((,mem ,element 
+				 (,T_CHAR ,(char->integer element)))))
+		 (+ 2 mem) ))
+          ((integer? element)
+	   ;; <index, value, (T_Integer, value)>
+	   (cons (append table
+			 `((,mem ,element
+				 (,T_INTEGER ,element))))
+		 (+ 2 mem)))
+          ((rational? element)
+	   ;; <index, value, (T_Fraction, num, denum)>
+	   (cons (append table
+			 `((,mem ,element
+				 (,T_FRACTION ,(numerator element) ,(denominator element)))))
+		 (+ 3 mem)))
+          ((string? element)
+	   ;; <index, value, (T_STRING, length, ASCII-list)>
+	   (cons (append table
+			 `((,mem ,element
+				 (,T_STRING ,(string-length element) ,(map char->integer (string->list element))))))
+		 (+ mem (string-length element) 2))) 
           ((symbol? element)
+	   ;; <index, symbol, (T_Symbol, string)>
            (let ((rep-str (symbol->string element)))
              (if (c-table-contains? table rep-str)
-                 (cons (append table `((,mem ,element (,T_SYMBOL ,(c-table-contains? table rep-str))))) (+ 2 mem))
-                 (add-to-c-table (car (add-to-c-table table rep-str mem)) element (cdr (add-to-c-table table rep-str mem))))))
-          ((pair? element) (cons (append table `((,mem ,element 
-						       (,T_PAIR ,(c-table-contains? table (car element)) ,(c-table-contains? table (cdr element)))))) (+ 3 mem)))
-          ((vector? element) (cons (append table `((,mem ,element 
-							 (,T_VECTOR ,(vector-length element) ,(map (lambda (x) (c-table-contains? table x)) (vector->list element)))))) (+ mem (vector-length element) 2)))
+                 (cons (append table
+			       `((,mem ,element (,T_SYMBOL ,(c-table-contains? table rep-str)))))
+		       (+ 2 mem))
+                 (add-to-c-table (car (add-to-c-table table rep-str mem))
+				 element
+				 (cdr (add-to-c-table table rep-str mem))))))
+          ((pair? element)
+	   ;; <index, value, (T_PAIR, car-index, cdr-index)>
+	   (cons (append table
+			 `((,mem ,element 
+				 (,T_PAIR ,(c-table-contains? table (car element)) ,(c-table-contains? table (cdr element))))))
+		 (+ 3 mem)))
+          ((vector? element)
+	   ;; <index, value, (T_Vector, length, index-list-of-elements)>
+	   (cons (append table
+			 `((,mem ,element 
+				 (,T_VECTOR ,(vector-length element) ,(map (lambda (x) (c-table-contains? table x)) (vector->list element))))))
+		 (+ mem (vector-length element) 2)))
           (else 'error))))
 
 (define last-mem
@@ -224,117 +273,130 @@
   (lambda (exp mem)
     (build-c-table (master-const-extract exp) mem)))
 
+(define c-table-getLine
+  (lambda (table element)
+      (cond ((null? table)
+	     #f)
+	    ((equal? element (second (first table)))
+	     (first table))
+	    (else
+	     (c-table-getLine (cdr table) element)))))
+  
 ;;a.k.a:  c-table[i] =
 (define c-table '())
 (define const-label "L_const")
 (define fvar-label "L_global")
 
 (define cg-c-table
-  (lambda ()
+  (lambda (ct)
+    ;;(display (format "Generating C-Table...\n~a\n" ct))
     (fold-left string-append
+	       (list->string '())
 	       (map (lambda (row)
 		      ;; Row = <Index, Value, (Type, Type-Data)>
 		      (let* ((index (first row))
+			     (value (second row))
 			     (data (third row))
 			     (type (first data))
-			     (type-data (second data)))
+			     (type-data (cdr data)))
 			(cond
 			 ((equal? T_VOID type)
 			  (cg-T-void index))
-			 ((equal? T_NIL type))
-			 ((equal? T_INTEGER type))
-			 ((equal? T_FRACTION type))
-			 ((equal? T_BOOL type))
-			 ((equal? T_CHAR type))
-			 ((equal? T_STRING type))
-			 ((equal? T_SYMBOL type))
-			 ((equal? T_CLOSURE type))
-			 ((euqal? T_PAIR type))
-			 ((equal? T_VECTOR type))
+			 ((equal? T_NIL type)
+			  (cg-T-nil index))
+			 ((equal? T_INTEGER type)
+			  (cg-T-integer value index))
+			 ((equal? T_FRACTION type)
+			  (cg-T-fraction (first type-data) (second type-data) index))
+			 ((equal? T_BOOL type)
+			  (cg-T-bool (first type-data) index))
+			 ((equal? T_CHAR type)
+			  (cg-T-char value index))
+			 ((equal? T_STRING type)
+			  (cg-T-string (second data) (third data) index))
+			 ((equal? T_SYMBOL type)
+			  (cg-T-symbol (first type-data) index))
+			 ((euqal? T_PAIR type)
+			  (cg-T-pair (first type-data) (second type-data) index))
+			 ((equal? T_VECTOR type)
+			  (cg-T-vector (first type-data) (second type-data) index))
 			 (else (number->string T_UNDEFINED)))))
-		    c-table)
-	       "")))
+		    ct)
+	       )))
 
 (define make-const-label
   (lambda (index)
-    (string-append const-label index ":" newLine)))
+    (string-append const-label (number->string index) ":" newLine)))
 
 (define cg-T-void
   (lambda (index)
-    (string-append (make-const-label index)
+    (string-append "sobVoid:" newLine
 		   tab "dq SOB_VOID" newLine)))
 
 (define cg-T-nil
   (lambda (index)
-    (string-append (make-const-label index)
+    (string-append "sobNil:" newLine
 		   tab "dq SOB_NIL" newLine)))
 
 (define cg-T-bool
-  (lambda (value)
-    (if (equal? value 0)
-    (string-append
-     tab "dq SOB_TRUE" newLine)
-    (string-append
-      tab "dq SOB_FALSE" newLine))))
+  (lambda (value index)
+    (let ((true (equal? value 1)))
+      (string-append "sob" (if true
+			      "True"
+			      "False") ":" newLine
+		     tab (if true
+			     "dq SOB_TRUE" 
+			     "dq SOB_FALSE")
+		     newLine))))
 
 (define cg-T-char
-  (lambda (value)
-    (string-append
-     tab "dq MAKE_LITERAL(T_CHAR," (number->string value) ")" newLine)))
+  (lambda (value index)
+    (string-append (make-const-label index)
+		   tab "dq MAKE_LITERAL(T_CHAR, " (number->string value) ")" newLine)))
 
 (define cg-T-integer
-  (lambda (value)
-    (string-append
-     tab "PUSH(IMM(" (number->string value) "));" newLine
-     tab "CALL(MAKE_SOB_INTEGER);" newLine
-     tab "DROP(1);" newLine)))
+  (lambda (value index)
+    (string-append (make-const-label index)
+		   tab "dq MAKE_LITERAL(T_INTEGER, " (number->string value) ")" newLine)))
 
 (define cg-T-fraction
-  (lambda (num denum)
-    (string-append
-     tab "MAKE_LITERAL_FRACTION(" num ", " denum ")" newLine)))
+  (lambda (num denum index)
+    (string-append (make-const-label index)
+		   tab "dq MAKE_LITERAL_FRACTION(T_FRACTION, " (number->string num) ", " (number->string denum) ")" newLine)))
+
+(define append-params
+  (lambda (params)
+  (fold-left (lambda (result current)
+	       (string-append result
+			      (if (not (equal? current (first params)))
+				  ", "
+				  " ")
+			      (number->string current)))
+	     ""
+	     params)))
 
 (define cg-T-string
-  (lambda (length chars)
-    (let ((chars (fold-left (lambda (acc current)
-                              (string-append acc tab "PUSH(IMM(" (number->string current) "));" newLine))
-                            ""
-                            chars)))
-      (string-append
-       chars
-       tab "PUSH(IMM(" (number->string length) "));" nl
-       tab "CALL(MAKE_SOB_STRING);" nl
-       tab "POP(R1);" nl
-       tab "DROP(R1);" nl))))
+  (lambda (length chars index)
+    ;;(display (format "generating string const = ~a\n" chars))
+    (string-append
+     (make-const-label index)
+     tab "MAKE_LITERAL_STRING" (append-params chars) newLine)))
 
 (define cg-T-symbol
-  (lambda (str-add)
-    (string-append
-     tab "PUSH(IMM(" (number->string str-add) "));" nl
-     tab "CALL(MAKE_SOB_SYMBOL);" nl
-     tab "DROP(1);" nl)))
+  (lambda (stringIndex index)
+    (string-append (make-const-label index)
+		   tab "dq MAKE_LITERAL_SYMBOL(" const-label (number->string stringIndex) ")" newLine)))
 
 (define cg-T-pair
-  (lambda (car cdr)
-    (string-append
-     tab "PUSH(IMM(" (number->string cdr) "));" nl
-     tab "PUSH(IMM(" (number->string car) "));" nl
-     tab "CALL(MAKE_SOB_PAIR);" nl
-     tab "DROP(2);" nl)))
+  (lambda (carIndex cdrIndex index)
+    (string-append (make-const-label index)
+		   tab "dq MAKE_LITERAL_PAIR(" const-label (number->string carIndex) ", " (number->string cdrIndex) ")" newLine)))
 
 (define cg-T-vector
-  (lambda (length items)
-    (let ((items (fold-left (lambda (acc current)
-                              (string-append acc tab "PUSH(IMM(" (number->string current) "));" nl))
-                            ""
-                            items)))
-      (string-append
-       items
-       tab "PUSH(IMM(" (number->string length) "));" nl
-       tab "CALL(MAKE_SOB_VECTOR);" nl
-       tab "POP(R1);" nl
-       tab "DROP(IND(R1));" nl))))
-
+  (lambda (length items index)
+    (string-append
+     (make-const-label index)
+     tab "MAKE_LITERAL_VECTOR " (append-params items) newLine)))
 	   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  F-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -428,8 +490,9 @@
 			 ((tag? 'applic pe)
 			  (string-append ";" (format "~a" pe)))
 			 
-			 ((tag? 'tc-applic pe))
-			 
+			 ((tag? 'tc-applic pe)
+			  (string-append ";" (format "~a" pe)))
+		   
 			 ((tag? 'set pe)
 			  ;;(set! (*var var * *) value)
 			  (let* ((var (second pe))
@@ -467,18 +530,33 @@
     (string-append name (number->string labelIndex))))
 
 (define cg-print-rax
-    (string-append
-     tab "PUSH qword [RAX]" newLine
-     tab "call write_sob_if_not_void" newLine
-     tab "ADD rsp, 1*8" newLine))
+  (string-append
+   tab "PUSH qword [RAX]" newLine
+   tab "call write_sob_if_not_void" newLine
+   tab "ADD rsp, 1*8" newLine))
+
+(define cg-print*
+  (string-append
+   tab "MOV RAX"
+   tab "PUSH qword [RAX]" newLine
+   tab "call write_sob_if_not_void" newLine
+   tab "ADD rsp, 1*8" newLine))
 
 (define cg-const
   (lambda (const)
-    (let ((index (number->string (c-table-contains? c-table const))))
-      ;;(display (format "address of ~a is ~b\n" const address))
-      (string-append
-       tab "MOV RAX, sobInt" (number->string const) newLine);;const-label index newLine)
-      )))
+    (let* ((row (c-table-getLine c-table const))
+	   (index (first row))
+	   (type (first (third row))))
+      (string-append ".t_" const-label (number->string index) ":" newLine
+		     tab "MOV RAX, " const-label (number->string index) newLine
+		     (if (equal? T_SYMBOL type)
+			 (string-append
+			  ;;tab "MOV RAX, [RAX]" newLine
+			  ;;tab "MOV RAX, [RAX]" newLine
+			  tab "DATA RAX" newLine
+			  ;;tab "MOV RAX,[RAX]" newLine
+			  )
+			 "")))))
 
 
 (define cg-or
@@ -540,11 +618,11 @@
     
 (define cg-seq
   (lambda (pe)
-    (fold-left (lambda (result e)
+    (list->string (fold-left (lambda (result e)
 	  ;;(display (format "cg-seq: e = ~a\nresult = ~b\n" e result))
 		 (string-append result (code-gen e) newLine))
-	       (list->string '())
-	       pe)))
+	       '()
+	       pe))))
 
 (define cg-set-bvar
   (lambda (var major minor)
@@ -610,19 +688,22 @@
 		       newLine
 		       ))
 
-(define pre-text (string-append
-		  "%include \"scheme.s\"" newLine
-		  ;; param-get-def
-		  newLine
-		  "section .bss" newLine
-		  "global main" newLine
-		  newLine
-		  "section .data" newLine
-		  "start_of_data:" newLine
-		  newLine
-		  "section .text" newLine
-		  newLine
-		  "main:" newLine))
+(define generate-pre-text
+  (lambda (ct)
+    ;;(display (format "Generating Prolog\n"))
+    (string-append "%include \"scheme.s\"" newLine
+		   ;; param-get-def
+		   newLine
+		   "section .bss" newLine
+		   "global main" newLine
+		   newLine
+		   "section .data" newLine
+		   "start_of_data:" newLine
+		   newLine
+		   (cg-c-table ct)
+		   "section .text" newLine
+		   newLine
+		   "main:" newLine)))
 
 (define p-format "%d")
 
@@ -639,9 +720,10 @@
 
 (define l-exit "L_exit")
 
-(define post-text (string-append newLine
-				 l-exit ":" newLine
-				 ;;tab "PUSH RAX" newLine
-				 ;;tab "call write_sob" newLine
-				 tab "ret" newLine
-				 ))
+(define post-text
+  ;;(begin
+    ;;(display (format "Generating Epilogue\n"))
+    (string-append l-exit ":" newLine
+		   ;;tab "PUSH RAX" newLine
+		   ;;tab "call write_sob" newLine
+		   tab "ret" newLine));;)

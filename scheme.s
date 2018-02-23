@@ -45,6 +45,8 @@
 	DATA_UPPER %1
 %endmacro
 
+%define MAKE_LITERAL_SYMBOL(stringAddress) ((stringAddress - start_of_data) << TYPE_BITS | T_SYMBOL)
+
 %define MAKE_LITERAL_PAIR(car, cdr) (((((car - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (cdr - start_of_data)) << TYPE_BITS) | T_PAIR)
 
 %define MAKE_LITERAL_FRACTION(top, bottom) (((((top - start_of_data) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (bottom - start_of_data)) << TYPE_BITS) | T_FRACTION)
@@ -154,8 +156,6 @@ global write_sob, write_sob_if_not_void, start_of_data, sobTrue, sobFalse, sobVo
 	
 section .data
 
-sobNil:
-	dq SOB_NIL
 sobInt3:
 	dq MAKE_LITERAL(T_INTEGER, 3)
 sobInt2:
@@ -196,12 +196,7 @@ sob8:
 	dq MAKE_LITERAL_PAIR(sob7, sobPairB)
 sobVec1:
 	MAKE_LITERAL_VECTOR sob8, sob7, sobInt1, sobInt2, sobInt3, sob4 
-sobTrue:
-	dq SOB_TRUE 
-sobFalse:
-	dq SOB_FALSE
-sobVoid:
-	dq SOB_VOID
+
 	
 	section .text
 a:
@@ -368,7 +363,7 @@ write_sob_bool:
 	mov rbp, rsp
 
 	mov rax, qword [rbp + 8 + 1*8]
-	cmp rax, SOB_FALSE
+	cmp rax, sobFalse
 	je .sobFalse
 	
 	mov rdi, .true
@@ -683,7 +678,7 @@ section .data
 section .text
 write_sob_if_not_void:
 	mov rax, qword [rsp + 1*8]
-	cmp rax, SOB_VOID
+	cmp rax, sobVoid
 	je .continue
 
 	push rax
