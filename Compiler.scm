@@ -280,7 +280,17 @@
 	     (first table))
 	    (else
 	     (c-table-getLine (cdr table) element)))))
-  
+
+(define c-table-getLine-byType
+  (lambda (table element type)
+      (cond ((null? table)
+	     #f)
+	    ((and (equal? element (second (first table)))
+		  (equal? type (first (third table))))
+	     (first table))
+	    (else
+	     (c-table-getLine (cdr table) element type)))))
+
 ;;a.k.a:  c-table[i] =
 (define c-table '())
 (define const-label "L_const")
@@ -535,6 +545,12 @@
   (string-append
    tab "PUSH qword [RAX]" newLine
    tab "call write_sob_if_not_void" newLine
+   tab "ADD rsp, 1*8" newLine))
+
+(define cg-print-symbol
+   (string-append
+   tab "PUSH RAX" newLine
+   tab "call write_sob_symbol" newLine
    tab "ADD rsp, 1*8" newLine))
 
 (define cg-const

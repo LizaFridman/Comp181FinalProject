@@ -96,7 +96,7 @@
 %endmacro
 
 %macro MAKE_LITERAL_SYMBOL 1+
-	dq (((((%%LstrEnd - %%Lstr) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (%%Lstr - start_of_data)) << TYPE_BITS) | T_SYMBOL)
+	dq ((((((%%LstrEnd - %%Lstr) >> 3) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (%%Lstr - start_of_data)) << TYPE_BITS) | T_SYMBOL)
 	%%Lstr:
 	dq %1
 	%%LstrEnd:		
