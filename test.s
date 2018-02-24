@@ -6,49 +6,49 @@ global main
 section .data
 start_of_data:
 
-sobVoid:
+L_const0:
 	dq SOB_VOID
-sobNil:
+L_const1:
 	dq SOB_NIL
-sobFalse:
+L_const2:
 	dq SOB_FALSE
-sobTrue:
+L_const4:
 	dq SOB_TRUE
 L_const6:
-	dq MAKE_LITERAL(T_INTEGER, 1)
-L_const8:
-	MAKE_LITERAL_STRING 97
-L_const11:
-	MAKE_LITERAL_SYMBOL L_const8
-L_const13:
-	MAKE_LITERAL_STRING 72, 101, 108, 108, 111
+	dq MAKE_LITERAL(T_INTEGER, 6)
 section .text
 
 main:
 
-;(const 1)
-.t_L_const6:
+;(or ((const #f) (or ((const #f) (const #f))) (const 6)))
+;(const #f)
+	MOV RAX, L_const2
+
+
+	CMP RAX, L_const2
+	JNE L_orEnd1
+;(or ((const #f) (const #f)))
+;(const #f)
+	MOV RAX, L_const2
+
+
+	CMP RAX, L_const2
+	JNE L_orEnd2
+;(const #f)
+	MOV RAX, L_const2
+
+
+L_orEnd2:
+
+	CMP RAX, L_const2
+	JNE L_orEnd1
+;(const 6)
 	MOV RAX, L_const6
 
+
+L_orEnd1:
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8
-
-;(const a)
-.t_L_const11:
-	MOV RAX, L_const11
-
-	PUSH qword [RAX]
-	call write_sob_if_not_void
-	ADD rsp, 1*8
-
-;(const Hello)
-.t_L_const13:
-	MOV RAX, L_const13
-
-	PUSH qword [RAX]
-	call write_sob_if_not_void
-	ADD rsp, 1*8
-
 L_exit:
 	ret

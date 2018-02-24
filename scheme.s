@@ -248,7 +248,7 @@ write_sob_undefined:
 section .data
 .undefined:
 	db "#<undefined>", 0
-
+	
 write_sob_integer:
 	push rbp
 	mov rbp, rsp
@@ -266,6 +266,8 @@ section .data
 .int_format_string:
 	db "%ld", 0
 
+section .text
+	
 write_sob_char:
 	push rbp
 	mov rbp, rsp
@@ -330,6 +332,7 @@ write_sob_char:
 	leave
 	ret
 
+	
 section .data
 .space:
 	db "#\space", 0
@@ -348,6 +351,8 @@ section .data
 .regular:
 	db "#\%c", 0
 
+section .text
+	
 write_sob_void:
 	push rbp
 	mov rbp, rsp
@@ -362,13 +367,15 @@ write_sob_void:
 section .data
 .void:
 	db "#<void>", 0
+
+section .text
 	
 write_sob_bool:
 	push rbp
 	mov rbp, rsp
 
 	mov rax, qword [rbp + 8 + 1*8]
-	cmp rax, sobFalse
+	cmp rax, L_const2
 	je .sobFalse
 	
 	mov rdi, .true
@@ -405,6 +412,8 @@ section .data
 .nil:
 	db "()", 0
 
+section .text
+	
 write_sob_string:
 	push rbp
 	mov rbp, rsp
@@ -500,6 +509,8 @@ section .data
 .fs_newline:
 	db "\n", 0
 
+section .text
+	
 write_sob_string_wo_quotes:
 	push rbp
 	mov rbp, rsp
@@ -832,6 +843,8 @@ section .data
 	db "\r", 0
 .fs_newline:
 	db "\n", 0
+
+section .text
 	
 write_sob_fraction:
 	push rbp
@@ -854,6 +867,7 @@ write_sob_closure:
 
 	leave
 	ret
+	
 section .data
 .closure:
 	db "#<closure [env:%p, code:%p]>", 0
@@ -874,7 +888,7 @@ section .data
 section .text
 write_sob_if_not_void:
 	mov rax, qword [rsp + 1*8]
-	cmp rax, sobVoid
+	cmp rax, L_const0
 	je .continue
 
 	push rax

@@ -83,7 +83,10 @@
   (lambda (sexprs)
     (fold-left string-append
 	       ""
-	       (map code-gen
+	       (map (lambda (expr)
+		      (string-append
+		       (code-gen expr)
+		       cg-print-rax))
 		    sexprs))))
 
 (define compile-scheme-file
@@ -95,6 +98,7 @@
       ;;(display (format "C-Table:\n~a\n" c-table))
 	  ;;(set! f-table (build-f-table pipelined '() 0))
       ;;(display (format "F-Table:\n~a\n" f-table))
+      ;;(display (format "pipelinded = ~a\n" pipelined))
       (let* ((pre (generate-pre-text c-table))
 	    (code (create-code-to-run pipelined)))
 	;;(display (format "Generated:\n~a\nCode:\n~b\n" gen code))
@@ -155,11 +159,6 @@
 	(cdr exp)
 	(map (lambda (x) (cadr x))
 	     (ordered-those-that-pass exp tagged-by-const)))))
-
-					;(define extract-and-topo-sort-consts
-					;  (lambda (exp)
-					;    (map (lambda (x) (reverse (topological-sort x))) (extract-consts exp))
-					;    ))
 
 (define extract-and-topo-sort-consts
   (lambda (exp done)
@@ -339,20 +338,18 @@
 
 (define cg-T-void
   (lambda (index)
-    (string-append "sobVoid:" newLine
+    (string-append (make-const-label index)
 		   tab "dq SOB_VOID" newLine)))
 
 (define cg-T-nil
   (lambda (index)
-    (string-append "sobNil:" newLine
+    (string-append (make-const-label index)
 		   tab "dq SOB_NIL" newLine)))
 
 (define cg-T-bool
   (lambda (value index)
     (let ((true (equal? value 1)))
-      (string-append "sob" (if true
-			      "True"
-			      "False") ":" newLine
+      (string-append (make-const-label index)
 		     tab (if true
 			     "dq SOB_TRUE" 
 			     "dq SOB_FALSE")
@@ -620,7 +617,7 @@
     (let* ((row (c-table-getLine c-table const))
 	   (index (first row))
 	   (type (first (third row))))
-      (string-append ".t_" const-label (number->string index) ":" newLine
+      (string-append ;;".t_" const-label (number->string index) ":" newLine
 		     tab "MOV RAX, " const-label (number->string index)  newLine
 		     ;;(if (equal? T_SYMBOL type)
 		     ;; (string-append
@@ -628,8 +625,8 @@
 		     ;;tab "MOV RAX, [RAX]" newLine
 		     ;;tab "DATA RAX" newLine
 		     ;;tab "MOV RAX,[RAX]" newLine)
-		     newLine
-		     cg-print-rax
+		     ;;newLine
+		     ;;cg-print-rax
 		     newLine))))
 
 
@@ -644,7 +641,11 @@
 	    (else
 	     (let ((cg-i (code-gen (first lst))))
 	       (string-append cg-i newLine
-			      tab "CMP RAX, qword [sobFalse]" newLine
+			      tab "CMP RAX, "
+			      (string-append const-label
+					     (number->string
+					      (c-table-contains? c-table #f)))
+			      newLine
 			      tab "JNE " end-label newLine
 			      (cg-or (cdr lst) end-label)))))))
 

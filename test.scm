@@ -1,3 +1,1 @@
-1
-'a
-"Hello"
+(or #f (or #f #f) 6)
