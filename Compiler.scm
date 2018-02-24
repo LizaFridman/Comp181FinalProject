@@ -65,6 +65,7 @@
 
 (define list->sexprs
   (lambda (lst)
+    ;;(display (format "list->sexprs[lst] = ~a\n"lst))
         (pipeline lst)))
 
 (define string->sexprs
@@ -84,6 +85,7 @@
     (fold-left string-append
 	       ""
 	       (map (lambda (expr)
+		      
 		      (string-append
 		       (code-gen expr)
 		       cg-print-rax))
@@ -577,7 +579,7 @@
 						 ((tag? 'fvar var)
 						  (cg-set-fvar (cdr var)))
 						 (else "Undefined variable type"))
-					   tab "MOV RAX, qword [sobVoid]" newLine)))
+					   tab "MOV RAX, " sobVoid newLine)))
 			 
 			 ((tag? 'box pe))
 			 
@@ -626,12 +628,13 @@
 		     ;;tab "DATA RAX" newLine
 		     ;;tab "MOV RAX,[RAX]" newLine)
 		     ;;newLine
-		     ;;cg-print-rax
-		     newLine))))
+		     ;;cg-print-rax)
+		     ))))
 
 
 (define cg-or
   (lambda (lst end-label)
+    ;;(display (format "sobFalse = ~a\n" (sobFalse)))
       (cond ((null? lst)
 	     (list->string '()))
 	    ((null? (cdr lst))
@@ -641,10 +644,7 @@
 	    (else
 	     (let ((cg-i (code-gen (first lst))))
 	       (string-append cg-i newLine
-			      tab "CMP RAX, "
-			      (string-append const-label
-					     (number->string
-					      (c-table-contains? c-table #f)))
+			      tab "CMP RAX, " (sobFalse)
 			      newLine
 			      tab "JNE " end-label newLine
 			      (cg-or (cdr lst) end-label)))))))
@@ -671,6 +671,12 @@
      tab "CMP RAX, " undefined newLine
      tab "JE "u-label newLine))))
 
+(define sobFalse
+  (lambda ()
+    (string-append const-label (number->string (c-table-contains? c-table #f)))))
+
+(define sobVoid (string-append const-label "0"))
+
 (define cg-if3
   (lambda (test dit dif)
     (let ((test-cg (code-gen test))
@@ -680,12 +686,11 @@
 	  (l-end (make-label "L_ifEnd")))
       
       (string-append test-cg newLine
-		     tab "MOV RBX, qword [sobFalse]" newLine
+		     tab "MOV RBX, " (sobFalse) newLine
 		     tab "CMP RAX, RBX" newLine
 		     tab "JE " l-dif newLine
 		     dit-cg newLine
 		     tab "JMP " l-end newLine
-
 		     l-dif ":" newLine
 		     dif-cg newLine
 		     l-end ":" newLine
@@ -725,7 +730,7 @@
     (let ((address (number->string (f-table-get var f-table))))
     (string-append (code-gen value) newLine
 		   tab "MOV qword [" address "], RAX" newLine
-		   tab "MOV RAX, qword [sobVoid]" newLine))))
+		   tab "MOV RAX, " sobVoid newLine))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
