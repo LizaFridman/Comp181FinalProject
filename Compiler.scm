@@ -2,7 +2,6 @@
 (load "tag-parser.scm")
 (load "semantic-analyzer.scm")
 
-
 (define first
   (lambda (lst)
     (car lst)))
@@ -82,10 +81,10 @@
 
 (define create-code-to-run
   (lambda (sexprs)
+    (display (format "Sexprs: ~a\n" sexprs))
     (fold-left string-append
 	       ""
 	       (map (lambda (expr)
-		      
 		      (string-append
 		       (code-gen expr)
 		       cg-print-rax))
@@ -103,7 +102,7 @@
       ;;(display (format "pipelinded = ~a\n" pipelined))
       (let* ((pre (generate-pre-text c-table))
 	    (code (create-code-to-run pipelined)))
-	;;(display (format "Generated:\n~a\nCode:\n~b\n" gen code))
+	(display (format "Generated:\n~a\nCode:\n~b\n" gen code))
 	(list->file (string->list (string-append pre
 						 newLine
 						 code
@@ -370,7 +369,7 @@
 (define cg-T-fraction
   (lambda (num denum index)
     (string-append (make-const-label index)
-		   tab "dq MAKE_LITERAL_FRACTION(T_FRACTION, " (number->string num) ", " (number->string denum) ")" newLine)))
+		   tab "dq MAKE_LITERAL_FRACTION(" (number->string num) ", " (number->string denum) ")" newLine)))
 
 (define append-params
   (lambda (params)
@@ -770,7 +769,7 @@
 
 (define generate-pre-text
   (lambda (ct)
-    ;;(display (format "Generating Prolog\n"))
+    (display (format "Generating Prolog\n"))
     (string-append "%include \"scheme.s\"" newLine
 		   ;; param-get-def
 		   newLine
