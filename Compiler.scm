@@ -97,10 +97,10 @@
       ;;(display (format "Before c-table...\n"))
       (set! c-table (master-build-c-table pipelined 6))
       ;;(display (format "C-Table:\n~a\n" c-table))
-	  ;;(set! f-table (build-f-table pipelined '() 0))
+	  (set! f-table (build-f-table pipelined '() 0))
       ;;(display (format "F-Table:\n~a\n" f-table))
       ;;(display (format "pipelinded = ~a\n" pipelined))
-      (let* ((pre (generate-pre-text c-table))
+      (let* ((pre (generate-pre-text c-table f-table))
 	    (code (create-code-to-run pipelined)))
 	(display (format "Generated:\n~a\nCode:\n~b\n" gen code))
 	(list->file (string->list (string-append pre
@@ -174,7 +174,14 @@
 	'()
 	(extract-and-topo-sort-consts (extract-consts exp) '()))))
 
-
+(define float->integer-func ;not very efficient, #f if didnt find or fnum being integer
+	(lambda (fnum guess)
+		(cond ((equal? 0.0 (- fnum guess)) guess)
+			  ((> guess fnum) #f)
+			  (else (float->integer-func fnum (+ 1 guess)))))) 
+(define float->integer ;not very efficient, #f if didnt find or fnum being integer
+	(lambda (fnum)
+		(float->integer-func fnum 0)))
 
 (define add-to-c-table  ;returns (table . nextmem)
   (lambda (table element mem)
@@ -190,12 +197,22 @@
 			 `((,mem ,element
 				 (,T_INTEGER ,element))))
 		 (+ 2 mem)))
-          ((rational? element)
+          ((rational? element);-----------------------------------------------------------------------------------------------------------------changed-----------------------------------
 	   ;; <index, value, (T_Fraction, num, denum)>
-	   (cons (append table
-			 `((,mem ,element
-				 (,T_FRACTION ,(numerator element) ,(denominator element)))))
-		 (+ 3 mem)))
+          (let ((top (float->integer (numerator element)))
+          		(bottom (float->integer (denominator element))))
+             (cond ((and (c-table-contains? table top) (c-table-contains? table bottom)) ;has both ints -> add fraction           
+                		 (cons (append table `((,mem ,element (,T_FRACTION ,(c-table-contains? table top) ,(c-table-contains? table bottom))))) (+ 3 mem)))
+             	   ((c-table-contains? table top)										 ;has only numerator -> add denominator and do again
+             	   		 (add-to-c-table (car (add-to-c-table table bottom mem))
+							 element
+								 (cdr (add-to-c-table table bottom mem))))
+             	   (else																 ;has only maybe the denominator -> add numerator and do again 
+             	   		 (add-to-c-table (car (add-to-c-table table top mem))
+							 element
+								 (cdr (add-to-c-table table top mem)))))))
+
+          
           ((string? element)
 	   ;; <index, value, (T_STRING, length, ASCII-list)>
 	   (cons (append table
@@ -337,6 +354,10 @@
   (lambda (index)
     (string-append const-label (number->string index) ":" newLine)))
 
+(define make-fvar-label
+  (lambda (index)
+    (string-append fvar-label (number->string index) ":" newLine)))
+
 (define cg-T-void
   (lambda (index)
     (string-append (make-const-label index)
@@ -447,13 +468,13 @@
 ;			     `(,@ft `(,(first vars) ,index))
 ;			     (+ index 1))))))
 
-(define f-table-get-func
+(define f-table-get-func ;; index
 	(lambda (table element)
 		(cond ((null? table) #f) 
 			  ((equal? (second (car table)) element) (first (car table)))
 			  (else (f-table-get-func (cdr table) element)))))
 
-(define f-table-get
+(define f-table-get ;; index
 	(lambda (element)
 		(f-table-get-func f-table element)))
 		
@@ -469,7 +490,7 @@
   (map (lambda (x) (cadr x))
        (ordered-those-that-pass exp tagged-by-fvar)))))
 
-(define f-table-contains?
+(define f-table-contains?;input is list of fvars, not the final table
   (lambda (table element)
     (cond ((null? table) #f)
           ((equal? (car table) element) element)
@@ -492,19 +513,17 @@
     (reverse (give-indxes '() lst 0))))
 
 (define master-build-f-table
-  (lambda (lst)
-    (master-give-indxes (build-f-table '() lst))))
+  (lambda (exp)
+    (master-give-indxes (build-f-table '() (extract-fvars exp)))))
 
-
-
-(define code-gen-f-table
+(define cg-f-table
   (lambda (table)
     (fold-left string-append
-               "// f-table initialization\n"
+               ";; table initialization\n"
                (map (lambda (line)
                         (string-append
-                         
-                          tab "dq MAKE_LITERAL(T_UNDEFINED," (symbol->string value) ")" nl
+                         fvar-label (number->string (first line)) ":" newLine ;TODO: change this line to the labels
+                          tab "dq MAKE_LITERAL(T_UNDEFINED, 0)" newLine
 
                          ))
                     table))))
@@ -661,15 +680,16 @@
      tab "MOV RAX, qword [RAX + " major "*8]" newLine
      tab "MOV RAX, qword [RAX + " minor "*8]" newLine)))
 
-(define cg-fvar
+(define cg-fvar ;var needs to be the symbol
   (lambda (var)
     (let ((undefined 0)
 	  (u-label "L_error_undefined_fvar"))
     (string-append
-     tab "MOV RAX, [" (number->string (f-table-get var)) "]" newLine
-     tab "CMP RAX, " undefined newLine
-     tab "JE "u-label newLine))))
-
+   ;  tab "MOV RAX, [" (number->string (f-table-get var)) "]" newLine
+   ;  tab "CMP RAX, " undefined newLine
+   ;  tab "JE "u-label newLine
+    tab "MOV RAX, " fvar-label (number->string (f-table-get var))  newLine
+   ))))
 (define sobFalse
   (lambda ()
     (string-append const-label (number->string (c-table-contains? c-table #f)))))
@@ -721,7 +741,7 @@
   ;; RAX = [|value|]
   (lambda (var)
     (string-append
-     tab "MOV qword [" (number->string (f-table-contains? var f-table)) "], RAX" newLine)))
+     tab "MOV qword [" fvar-label (number->string (f-table-get var)) "], RAX" newLine)))
 
 
 (define cg-define
@@ -768,8 +788,8 @@
 		       ))
 
 (define generate-pre-text
-  (lambda (ct)
-    (display (format "Generating Prolog\n"))
+  (lambda (ct ft)
+    ;;(display (format "Generating Prolog\n"))
     (string-append "%include \"scheme.s\"" newLine
 		   ;; param-get-def
 		   newLine
@@ -779,6 +799,7 @@
 		   "section .data" newLine
 		   "start_of_data:" newLine
 		   newLine
+		   (cg-f-table ft)
 		   (cg-c-table ct)
 		   "section .text" newLine
 		   newLine
