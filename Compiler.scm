@@ -93,7 +93,7 @@
       ;;(display (format "Before c-table...\n"))
       (set! c-table (master-build-c-table pipelined 6))
       ;;(display (format "C-Table:\n~a\n" c-table))
-      ;;(set! f-table (build-f-table pipelined '() 0))
+	  ;;(set! f-table (build-f-table pipelined '() 0))
       ;;(display (format "F-Table:\n~a\n" f-table))
       (let* ((pre (generate-pre-text c-table))
 	    (code (create-code-to-run pipelined)))
@@ -413,42 +413,104 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  F-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;row = <Var-name, Index>
-(define f-table '())
+;(define f-table '())
 
-(define f-table-contains?
-  (lambda (var ft)
-    (let ((row (first ft)))
-      (cond ((null? ft)
-	     #f)
-	    ((equal? var (first row))
-	     (second row))
-	    (else (f-table-contains? var (cdr ft)))))))
+;(define f-table-contains?
+ ; (lambda (var ft)
+ ;   (let ((row (first ft)))
+ ;     (cond ((null? ft)
+;	     #f)
+;	    ((equal? var (first row))
+;	     (second row))
+;	    (else (f-table-contains? var (cdr ft)))))))
 
 ;; Returns a list of all fvar-values
+;(define extract-fvars
+  ;(lambda (pe)
+ ;   (cond ((not (pair? pe))
+;	   '())
+;	  ((tag? 'fvar pe)
+;	   (cdr pe))
+;	  (else
+;	   `(,@(extract-fvars (first pe)) ,@(extract-fvars (cdr pe)))))))
+
+;(define build-f-table
+;  (lambda (pe ft index)
+;    (add-to-f-table (remove-duplicates (extract-fvars pe)) ft index)))
+
+;(define add-to-f-table
+;  (lambda (vars ft index)
+ ;     (cond ((null? vars)
+;	     ft)
+;	    ((f-table-contains? (first vars) ft)
+;	     (add-to-f-table (cdr vars) ft index))
+;	    (else
+;	     (add-to-f-table (cdr vars)
+;			     `(,@ft `(,(first vars) ,index))
+;			     (+ index 1))))))
+
+(define f-table-get-func
+	(lambda (table element)
+		(cond ((null? table) #f) 
+			  ((equal? (second (car table)) element) (first (car table)))
+			  (else (f-table-get-func (cdr table) element)))))
+
+(define f-table-get
+	(lambda (element)
+		(f-table-get-func f-table element)))
+		
+
+(define tagged-by-fvar
+  (lambda (exp)
+    (and (pair? exp) (equal? (car exp) 'fvar))))
+
 (define extract-fvars
-  (lambda (pe)
-    (cond ((not (pair? pe))
-	   '())
-	  ((tag? 'fvar pe)
-	   (cdr pe))
-	  (else
-	   `(,@(extract-fvars (first pe)) ,@(extract-fvars (cdr pe)))))))
+  (lambda (exp)
+    (if (tagged-by-fvar exp)
+  (cdr exp)
+  (map (lambda (x) (cadr x))
+       (ordered-those-that-pass exp tagged-by-fvar)))))
+
+(define f-table-contains?
+  (lambda (table element)
+    (cond ((null? table) #f)
+          ((equal? (car table) element) element)
+          (else (f-table-contains? (cdr table) element)))))
+
+(define f-table-add 
+  (lambda (table element)
+    (if (f-table-contains? table element) table (append table (list element)))))
 
 (define build-f-table
-  (lambda (pe ft index)
-    (add-to-f-table (remove-duplicates (extract-fvars pe)) ft index)))
+  (lambda (table lst)
+    (if (null? lst) table (build-f-table (f-table-add table (car lst)) (cdr lst)))))
 
-(define add-to-f-table
-  (lambda (vars ft index)
-      (cond ((null? vars)
-	     ft)
-	    ((f-table-contains? (first vars) ft)
-	     (add-to-f-table (cdr vars) ft index))
-	    (else
-	     (add-to-f-table (cdr vars)
-			     `(,@ft `(,(first vars) ,index))
-			     (+ index 1))))))
+(define give-indxes
+  (lambda (after before indx)
+    (if (null? before) after (give-indxes (cons (list indx (car before)) after) (cdr before) (+ 1 indx)))))
 
+(define master-give-indxes ;needs a list - not a single element
+  (lambda (lst)
+    (reverse (give-indxes '() lst 0))))
+
+(define master-build-f-table
+  (lambda (lst)
+    (master-give-indxes (build-f-table '() lst))))
+
+
+
+(define code-gen-f-table
+  (lambda (table)
+    (fold-left string-append
+               "// f-table initialization\n"
+               (map (lambda (line)
+                        (string-append
+                         
+                          tab "dq MAKE_LITERAL(T_UNDEFINED," (symbol->string value) ")" nl
+
+                         ))
+                    table))))
+					
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Code Generation  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define tag?
