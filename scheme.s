@@ -500,6 +500,92 @@ section .data
 .fs_newline:
 	db "\n", 0
 
+write_sob_string_wo_quotes:
+	push rbp
+	mov rbp, rsp
+
+	mov rax, qword [rbp + 8 + 1*8]
+	mov rcx, rax
+	STRING_LENGTH rcx
+	STRING_ELEMENTS rax
+
+.loop:
+	cmp rcx, 0
+	je .done
+	mov bl, byte [rax]
+	and rbx, 0xff
+
+	cmp rbx, CHAR_TAB
+	je .ch_tab
+	cmp rbx, CHAR_NEWLINE
+	je .ch_newline
+	cmp rbx, CHAR_PAGE
+	je .ch_page
+	cmp rbx, CHAR_RETURN
+	je .ch_return
+	cmp rbx, CHAR_SPACE
+	jl .ch_hex
+	
+	mov rdi, .fs_simple_char
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_hex:
+	mov rdi, .fs_hex_char
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_tab:
+	mov rdi, .fs_tab
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_page:
+	mov rdi, .fs_page
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_return:
+	mov rdi, .fs_return
+	mov rsi, rbx
+	jmp .printf
+
+.ch_newline:
+	mov rdi, .fs_newline
+	mov rsi, rbx
+
+.printf:
+	push rax
+	push rcx
+	mov rax, 0
+	call printf
+	pop rcx
+	pop rax
+
+	dec rcx
+	inc rax
+	jmp .loop
+
+.done:
+	leave
+	ret
+	
+section .data
+	
+.fs_simple_char:
+	db "%c", 0
+.fs_hex_char:
+	db "\x%01x;", 0	
+.fs_tab:
+	db "\t", 0
+.fs_page:
+	db "\f", 0
+.fs_return:
+	db "\r", 0
+.fs_newline:
+	db "\n", 0
+
+
 section .text
 	
 write_sob_pair:
@@ -666,7 +752,7 @@ write_sob_symbol:
 	push rax
 	mov rax, qword [rax]
 	push qword [rax]
-	call write_sob_string
+	call write_sob_string_wo_quotes
 	add rsp, 1*8
 	pop rax
 	pop rcx
