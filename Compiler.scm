@@ -81,7 +81,7 @@
 
 (define create-code-to-run
   (lambda (sexprs)
-    (display (format "Sexprs: ~a\n" sexprs))
+    ;;(display (format "Sexprs: ~a\n" sexprs))
     (fold-left string-append
 	       ""
 	       (map (lambda (expr)
@@ -97,12 +97,12 @@
       ;;(display (format "Before c-table...\n"))
       (set! c-table (master-build-c-table pipelined 6))
       ;;(display (format "C-Table:\n~a\n" c-table))
-	  (set! f-table (build-f-table pipelined '() 0))
+	  (set! f-table (master-build-f-table pipelined))
       ;;(display (format "F-Table:\n~a\n" f-table))
       ;;(display (format "pipelinded = ~a\n" pipelined))
       (let* ((pre (generate-pre-text c-table f-table))
 	    (code (create-code-to-run pipelined)))
-	(display (format "Generated:\n~a\nCode:\n~b\n" gen code))
+	;;(display (format "Pre-Text:\n~a\nCode:\n~b\n" pre code))
 	(list->file (string->list (string-append pre
 						 newLine
 						 code
@@ -197,7 +197,7 @@
 			 `((,mem ,element
 				 (,T_INTEGER ,element))))
 		 (+ 2 mem)))
-          ((rational? element);-----------------------------------------------------------------------------------------------------------------changed-----------------------------------
+          ((rational? element)
 	   ;; <index, value, (T_Fraction, num, denum)>
           (let ((top (float->integer (numerator element)))
           		(bottom (float->integer (denominator element))))
@@ -599,11 +599,14 @@
 						 (else "Undefined variable type"))
 					   tab "MOV RAX, " sobVoid newLine)))
 			 
-			 ((tag? 'box pe))
+			 ((tag? 'box pe)
+			  "")
 			 
-			 ((tag? 'box-get pe))
+			 ((tag? 'box-get pe)
+			  "")
 	  
-			 ((tag? 'box-set? pe))
+			 ((tag? 'box-set? pe)
+			  "")
 			 
 			 (else 'Code-Generation-Error!)))))
 
@@ -717,11 +720,11 @@
     
 (define cg-seq
   (lambda (pe)
-    (list->string (fold-left (lambda (result e)
-	  ;;(display (format "cg-seq: e = ~a\nresult = ~b\n" e result))
+    (fold-left (lambda (result e)
+    ;;(display (format "cg-seq: e = ~a\nresult = ~b\n" e result))
 		 (string-append result (code-gen e) newLine))
-	       '()
-	       pe))))
+	       ""
+	       pe)))
 
 (define cg-set-bvar
   (lambda (var major minor)
