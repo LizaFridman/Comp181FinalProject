@@ -849,10 +849,33 @@ section .text
 write_sob_fraction:
 	push rbp
 	mov rbp, rsp
-
+	
+;;; Num
+	mov rax, qword [rbp + 8 + 1*8]
+	CAR rax
+	
+	push rax
+	call write_sob
+	add rsp, 1*8
+;;; /
+	mov rax, 0
+	mov rdi, .slash
+	call printf
+;;; Denum
+	mov rax, qword [rbp + 8 + 1*8]
+	CDR rax
+	
+	push rax
+	call write_sob
+	add rsp, 1*8
+	
 	leave
 	ret
 
+section .data
+.slash:
+	db "/", 0
+	
 write_sob_closure:
 	push rbp
 	mov rbp, rsp
