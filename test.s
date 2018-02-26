@@ -22,9 +22,9 @@ L_const8:
 L_const10:
 	dq MAKE_LITERAL(T_INTEGER, 3)
 L_const12:
-	dq MAKE_LITERAL(T_CHAR, a)
+	dq MAKE_LITERAL(T_CHAR, 'a')
 L_const14:
-	dq MAKE_LITERAL(T_CHAR, A)
+	dq MAKE_LITERAL(T_CHAR, 'A')
 L_const16:
 	dq MAKE_LITERAL(T_CHAR, CHAR_NEWLINE)
 L_const18:
@@ -46,23 +46,23 @@ L_const34:
 L_const36:
 	dq MAKE_LITERAL_FRACTION(L_const32, L_const34)
 L_const39:
-	dq MAKE_LITERAL_PAIR(L_const10, 1)
+	dq MAKE_LITERAL_PAIR(L_const10, L_const1)
 L_const42:
-	dq MAKE_LITERAL_PAIR(L_const8, 39)
+	dq MAKE_LITERAL_PAIR(L_const8, L_const39)
 L_const45:
-	dq MAKE_LITERAL_PAIR(L_const6, 42)
+	dq MAKE_LITERAL_PAIR(L_const6, L_const42)
 L_const48:
-	dq MAKE_LITERAL_PAIR(L_const22, 1)
+	dq MAKE_LITERAL_PAIR(L_const22, L_const1)
 L_const51:
-	dq MAKE_LITERAL_PAIR(L_const10, 48)
+	dq MAKE_LITERAL_PAIR(L_const10, L_const48)
 L_const54:
-	dq MAKE_LITERAL_PAIR(L_const51, 1)
+	dq MAKE_LITERAL_PAIR(L_const51, L_const1)
 L_const57:
-	dq MAKE_LITERAL_PAIR(L_const8, 1)
+	dq MAKE_LITERAL_PAIR(L_const8, L_const1)
 L_const60:
-	dq MAKE_LITERAL_PAIR(L_const6, 57)
+	dq MAKE_LITERAL_PAIR(L_const6, L_const57)
 L_const63:
-	dq MAKE_LITERAL_PAIR(L_const60, 54)
+	dq MAKE_LITERAL_PAIR(L_const60, L_const54)
 L_const66:
 	dq MAKE_LITERAL(T_INTEGER, 1234)
 section .text

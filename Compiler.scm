@@ -238,15 +238,28 @@
 				 (cdr (add-to-c-table table rep-str mem))))))
           ((pair? element)
 	   ;; <index, value, (T_PAIR, car-index, cdr-index)>
-	   (cons (append table
-			 `((,mem ,element 
-				 (,T_PAIR ,(c-table-contains? table (car element)) ,(c-table-contains? table (cdr element))))))
-		 (+ 3 mem)))
+	   (let ((carIndex (c-table-contains? table (car element)))
+		 (cdrIndex (c-table-contains? table (cdr element))))
+	     (cond ((and carIndex cdrIndex)
+		    (cons (append table
+				  `((,mem ,element (,T_PAIR ,carIndex ,cdrIndex))))
+			  (+ 3 mem)))
+		   (carIndex
+		    (add-to-c-table (car (add-to-c-table table (second element) mem))
+				    element
+				    (cdr (add-to-c-table table (second element) mem))))
+		   (else (add-to-c-table (first (add-to-c-table table (first element) mem))
+					 element
+					 (second (add-to-c-table table (first element) mem)))))))
+	  
           ((vector? element)
 	   ;; <index, value, (T_Vector, length, index-list-of-elements)>
 	   (cons (append table
-			 `((,mem ,element 
-				 (,T_VECTOR ,(vector-length element) ,(map (lambda (x) (c-table-contains? table x)) (vector->list element))))))
+			 `((,mem ,element (,T_VECTOR
+					   ,(vector-length element)
+					   ,(map (lambda (x)
+						   (c-table-contains? table x))
+						 (vector->list element))))))
 		 (+ mem (vector-length element) 2)))
           (else 'error))))
 
@@ -262,11 +275,14 @@
 
 (define build-c-table-func
   (lambda (table lst mem)
-    (cond  ((null? lst) table)
-           ((c-table-contains? table (car lst)) (build-c-table-func table (cdr lst) mem))
+    (cond  ((null? lst)
+	    table)
+           ((c-table-contains? table (car lst))
+	    (build-c-table-func table (cdr lst) mem))
            (else
-	    (let*
-		((new-table (car (add-to-c-table table (car lst) mem))) (new-mem (cdr (add-to-c-table table (car lst) mem)))) (build-c-table-func new-table (cdr lst) new-mem))))))
+	    (let* ((new-table (car (add-to-c-table table (car lst) mem)))
+		   (new-mem (cdr (add-to-c-table table (car lst) mem))))
+	      (build-c-table-func new-table (cdr lst) new-mem))))))
 
 
 (define starting-table
@@ -401,7 +417,7 @@
 	     "\'\\\"\'")
 	    ((equal? val (char->integer #\\))
 	     "\'\\\'")
-	    (else (string value))))))
+	    (else (string-append "\'" (string value) "\'"))))))
 
 (define cg-T-char
   (lambda (value index)
@@ -447,8 +463,9 @@
 
 (define cg-T-pair
   (lambda (carIndex cdrIndex index)
+    ;;(display (format "Generating Pair: carIndx: ~a cdrIndx: ~a\n" carIndex cdrIndex))
     (string-append (make-const-label index)
-		   tab "dq MAKE_LITERAL_PAIR(" const-label (number->string carIndex) ", " (number->string cdrIndex) ")" newLine)))
+		   tab "dq MAKE_LITERAL_PAIR(" const-label (number->string carIndex) ", " const-label (number->string cdrIndex) ")" newLine)))
 
 (define cg-T-vector
   (lambda (length items index)
