@@ -52,6 +52,7 @@
     ((star <sexpr>) sexpr
      (lambda (match rest)
        (map (lambda (expr)
+	      (display (format "Pipelining ~a\n" expr))
 	      (annotate-tc
 	       (pe->lex-pe
 		(box-set
@@ -59,13 +60,6 @@
 		  (parse expr))))))
 	    match))
      (lambda (fail) 'fail))))
-
-
-
-(define list->sexprs
-  (lambda (lst)
-    ;;(display (format "list->sexprs[lst] = ~a\n"lst))
-        (pipeline lst)))
 
 (define string->sexprs
   (lambda (str)
@@ -92,16 +86,17 @@
 
 (define compile-scheme-file
   (lambda (source dest)
-    (let* ((pipelined (list->sexprs (file->list source)))
+    (let* ((exprs (file->list source))
+	   (pipelined (pipeline exprs))
 	   (size (length pipelined)))
+      (display (format "pipelinded = ~a\n" pipelined))
       ;;(display (format "Before c-table...\n"))
       (set! c-table (master-build-c-table pipelined 6))
       ;;(display (format "C-Table:\n~a\n" c-table))
-	  (set! f-table (master-build-f-table pipelined))
+      (set! f-table (master-build-f-table pipelined))
       ;;(display (format "F-Table:\n~a\n" f-table))
-      ;;(display (format "pipelinded = ~a\n" pipelined))
       (let* ((pre (generate-pre-text c-table f-table))
-	    (code (create-code-to-run pipelined)))
+	     (code (create-code-to-run pipelined)))
 	;;(display (format "Pre-Text:\n~a\nCode:\n~b\n" pre code))
 	(list->file (string->list (string-append pre
 						 newLine
@@ -418,7 +413,7 @@
 	    ((equal? val (char->integer #\\))
 	     "\'\\\'")
 	    ((equal? val (char->integer #\tab))
-	     "\'\t\'")
+	     "\'\t'")
 	    (else (string-append "\'" (string value) "\'"))))))
 
 (define cg-T-char
@@ -565,9 +560,10 @@
 (define cg-f-table
   (lambda (table)
     (fold-left string-append
+	       ""
                (map (lambda (line)
 		      (string-append
-		       fvar-label (number->string (first line)) ":" newLine ;TODO: change this line to the labels
+		       fvar-label (number->string (first line)) ":" newLine
 		       tab "dq MAKE_LITERAL(T_UNDEFINED, 0)" newLine
 		       
 		       ))
@@ -789,7 +785,7 @@
 
 (define cg-define
   (lambda (var value)
-    (let ((address (number->string (f-table-get var f-table))))
+    (let ((address (number->string (f-table-get var))))
     (string-append (code-gen value) newLine
 		   tab "MOV qword [" address "], RAX" newLine
 		   tab "MOV RAX, " sobVoid newLine))))
@@ -844,6 +840,9 @@
 		   newLine
 		   (cg-f-table ft)
 		   (cg-c-table ct)
+		 ;;(cg-built-in-closures (filter (lambda (row)
+		 ;;				   (built-in? (first row)))
+		 ;;				 f-table))
 		   "section .text" newLine
 		   newLine
 		   "main:" newLine)))
@@ -870,3 +869,170 @@
 		   ;;tab "PUSH RAX" newLine
 		   ;;tab "call write_sob" newLine
 		   tab "ret" newLine));;)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Built-in ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define built-in-map
+;; <func-name, func-label>
+  '((null? null-pred-label)
+    (boolean? bool-pred-label)
+    (char? char-pred-label)
+    (integer? integer-pred-label)
+    (number? number-pred-label)
+    (rational? rational-pred-label)
+    (pair? pair-pred-label)
+    (string? string-pred-label)
+    (symbol? symbol-pred-label)
+    (vector? vector-pred-label)
+    (procedure? closure-pred-label)))
+
+(define built-in-funcs
+  (map first built-in-map))
+
+(define built-in?
+  (lambda (fun)
+    (member func built-in-funcs)))
+
+(define cg-built-in
+  (lambda ()
+    (string-append
+     cg-null?
+     cg-bool?
+     cg-char?
+     cg-integer?
+     cg-number?
+     cg-rational?
+     cg-pair?
+     cg-string?
+     cg-symbol?
+     cg-vector?
+     cg-closure?)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Type Checks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define cg-type-check
+  (lambda (type-label . sub-types)
+    (string-append
+     type-label ":" newLine
+     tab "enter" newLine
+     tab "PUSHA" newLine
+     tab "MOV rax, [rbp + 8 + 1*8]" newLine
+
+     type-label "_predicate:" newLine
+     (fold-left string-append
+		""
+		(map (lambda (sub)
+		       (string-append
+			tab "CMP rax, " sub newLine
+			tab "JE " type-label "_match" newLine))
+		     sub-types))
+
+     tab "MOV rax, [L_const2]" newLine
+     tab "JMP " type-label "_end" newLine
+     newLine
+     type-label "_match:" newLine
+     tab "MOV rax, [L_const4]" newLine
+     type-label "_end:" newLine
+     
+     tab "POPA" newLine
+     tab "leave" newLine
+     tab "ret" newLine)))
+
+(define null-pred-label "L_null_check")
+
+(define cg-null?
+  (cg-type-check null-pred-label "T_NIL"))
+
+(define bool-pred-label "L_bool_check")
+
+(define cg-bool?
+  (cg-type-check bool-pred-label "T_BOOL"))
+
+(define char-pred-label "L_char_check")
+
+(define cg-char?
+  (cg-type-check char-pred-label "T_CHAR"))
+
+(define integer-pred-label "L_integer_check")
+
+(define cg-integer?
+  (cg-type-check integer-pred-label "T_INTEGER"))
+
+(define number-pred-label "L_number_check")
+
+(define cg-number?
+  (cg-type-check number-pred-label "T_INTEGER" "T_FRACTION"))
+
+(define rational-pred-label "L_rational_check")
+
+(define cg-rational?
+  (cg-type-check rational-pred-label "T_INTEGER" "T_FRACTION"))
+
+(define pair-pred-label "L_pair_check")
+
+(define cg-pair?
+  (cg-type-check pair-pred-label "T_PAIR"))
+
+(define string-pred-label "L_string_check")
+
+(define cg-string?
+  (cg-type-check string-pred-label "T_STRING"))
+
+(define symbol-pred-label "L_symbol_check")
+
+(define cg-symbol?
+  (cg-type-check symbol-pred-label "T_SYMBOL"))
+
+(define vector-pred-label "L_vector_check")
+
+(define cg-vector?
+  (cg-type-check vector-pred-label "T_VECTOR"))
+
+(define closure-pred-label "L_closure_check")
+
+(define cg-closure?
+  (cg-type-check closure-pred-label "T_CLOSURE"))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pair Operations ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Binary Operations ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; String Operations ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Vector Operations ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;; Closure Generation ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define cg-built-in-closures
+  (lambda (rows-to-create)
+    (fold-left string-append
+	       ""
+	       (map (lambda (row)
+		      (create-built-in-closure (first row)
+					       (second row)
+					       (second (assoc (first row) built-in-map))))
+		    rows-to-create))))
+
+(define create-built-in-closure
+  (lambda (var value func-label)
+    (string-append
+     "Create Closure for " var)))
+
+(define self-implemented
+  '((define append
+      (lambda (lst1 lst2)
+	(cond ((null? lst1)
+	       lst2)
+	      (else (cons (car lst1)
+			  (append (cdr lst1) lst2))))))
+    (define list
+       (lambda args args))
+    
+    (define zero?
+       (lambda (element)
+	 (and (number? element)
+	      (equal? 0 x))))))
+
+

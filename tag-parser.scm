@@ -18,11 +18,11 @@
 
 (define if-dit?
   (lambda (exprs)
-    (and (pair? exprs) (eq? 'if (car exprs)) (eq? (length exprs) 3))))
+    (and (list? exprs) (eq? 'if (car exprs)) (eq? (length exprs) 3))))
 
 (define if-dit-dif?
   (lambda (exprs)
-    (and (pair? exprs) (eq? 'if (car exprs)) (eq? (length exprs) 4))))
+    (and (list? exprs) (eq? 'if (car exprs)) (eq? (length exprs) 4))))
 
 (define empty-or?
   (lambda (expr)
@@ -34,11 +34,11 @@
 
 (define or?
   (lambda (expr)
-    (and (pair? expr) (eq? 'or (car expr)))))
+    (and (list? expr) (eq? 'or (car expr)))))
 
 (define lambda?
   (lambda (expr)
-    (and (pair? expr) (eq? 'lambda (car expr)) (>= (length expr) 3))))
+    (and (lambda? expr) (eq? 'lambda (car expr)) (>= (length expr) 3))))
 
 (define lambda-simple?
   (lambda (expr)
@@ -62,11 +62,11 @@
 
 (define begin?
   (lambda (expr)
-    (and (pair? expr) (eq? 'begin (car expr)))))
+    (and (list? expr) (eq? 'begin (car expr)))))
 
 (define define?
   (lambda (expr)
-    (and (pair? expr) (eq? 'define (car expr)) (>= (length expr) 3))))
+    (and (list? expr) (eq? 'define (car expr)) (>= (length expr) 3))))
 
 (define define-simple?
   (lambda (expr)
@@ -78,7 +78,7 @@
 
 (define set!?
   (lambda (expr)
-    (and (pair? expr) 
+    (and (list? expr) 
          (eq? 'set! (car expr)) 
          (= (length expr) 3) 
          (symbol? (cadr expr)))))
@@ -201,10 +201,16 @@
 
 (define parse
   (lambda (sexpr)
-    (cond ((or (const? sexpr) (void? sexpr)) 
-	   (if (quote? sexpr)
-	       `(const ,@(cdr sexpr))
-	       `(const ,sexpr)))
+    ;;(display (format "Parsing ~a\n" sexpr))
+    (cond ((or (const? sexpr)
+	       (void? sexpr))
+	   (begin
+	     (display (format "Parsing const ~a\n" sexpr))
+	     (if (quote? sexpr)
+		 ;;(begin
+		   ;;(display (format "Found quote! ~a\n" se))
+		 `(const ,@(cdr sexpr));;)
+		 `(const ,sexpr))))
 	  
 	  ((variable? sexpr) `(var ,sexpr))
 	  

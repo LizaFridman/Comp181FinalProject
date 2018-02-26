@@ -149,6 +149,26 @@
 	mov %1, qword [%1]
 %endmacro
 
+%macro PUSHA
+	PUSH rax
+	PUSH rbx
+	PUSH rcx
+	PUSH rdx
+	PUSH rbp
+	PUSH rsi
+	PUSH rdi
+%endmacro
+
+%macro POPA
+	POP rdi
+	POP rsi
+	POP rbp
+	POP rdx
+	POP rcx
+	POP rbx
+	POP rax
+%endmacro
+	
 %define SOB_UNDEFINED MAKE_LITERAL(T_UNDEFINED, 0)
 %define SOB_VOID MAKE_LITERAL(T_VOID, 0)
 %define SOB_FALSE MAKE_LITERAL(T_BOOL, 0)

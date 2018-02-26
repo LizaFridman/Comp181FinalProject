@@ -2,7 +2,7 @@
 
 (define lambda-simple-tag?
   (lambda (pe)
-    (and (pair? pe)
+    (and (list? pe)
  	 (eq? 'lambda-simple (car pe)))))
 
 (define lambda-opt-tag?
@@ -12,18 +12,22 @@
 
 (define applic-lambda-nil?
   (lambda (expr)
-    (and (pair? expr)
+    (and (list? expr)
 	 (eq? 'applic (car expr))
 	 (lambda-simple-tag? (cadr expr))
 	 (null? (cadadr expr)))))
 
 (define remove-applic-lambda-nil
   (lambda (expr)
+    ;;(display (format "Removing applic of lambda null for ~a\n" expr))
     (if (applic-lambda-nil? expr)
-	(let* ((lambda-simple (cadr expr))
-	       (body (caddr lambda-simple)))
-	  (remove-applic-lambda-nil body))
-	(if (not (pair? expr))
+	(begin
+	  ;;(display (format "~a passed as applic-lambda-nil\n" expr))
+	  (let* ((lambda-simple (cadr expr))
+		 (body (caddr lambda-simple)))
+	    (remove-applic-lambda-nil body)))
+	(if (or (not (list? expr))
+		(not (pair? expr)))
 	    expr
 	    (map remove-applic-lambda-nil expr)))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
