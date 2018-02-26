@@ -28,7 +28,7 @@ L_const14:
 L_const16:
 	dq MAKE_LITERAL(T_CHAR, CHAR_NEWLINE)
 L_const18:
-	dq MAKE_LITERAL(T_CHAR, '\"')
+	dq MAKE_LITERAL(T_CHAR, '"')
 L_const20:
 	dq MAKE_LITERAL(T_CHAR, '\')
 L_const22:

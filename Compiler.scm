@@ -414,7 +414,7 @@
       (cond ((equal? val (char->integer #\newline))
 	     "CHAR_NEWLINE")
 	    ((equal? val (char->integer #\"))
-	     "\'\\\"\'")
+	     "\'\"\'")
 	    ((equal? val (char->integer #\\))
 	     "\'\\\'")
 	    (else (string-append "\'" (string value) "\'"))))))
