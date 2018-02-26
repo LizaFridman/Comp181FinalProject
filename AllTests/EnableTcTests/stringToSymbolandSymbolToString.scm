@@ -1,0 +1,25 @@
+(string->symbol "maor")
+"maor"
+"meow"
+(string->symbol "meow")
+"meow"
+(string->symbol "meow")
+(string->symbol "maor")
+(string->symbol "haha")
+"haha"
+(symbol->string 'a)
+(symbol->string 'haha)
+(symbol->string 'meow)
+(symbol->string 'maor)
+(define koko (symbol->string 'koko))
+(string->symbol koko)
+(string->symbol (symbol->string 'yoyo))
+(symbol->string (string->symbol "try"))
+(string->symbol (symbol->string 'maor))
+(symbol->string (string->symbol "yoyo"))
+(define pnina (string->symbol "pnina"))
+(symbol->string pnina)
+(define to-symbol (lambda (x) (string->symbol x)))
+(to-symbol "check")
+(define to-string (lambda (x) (symbol->string x)))
+(to-string 'check2)

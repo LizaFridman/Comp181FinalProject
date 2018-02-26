@@ -375,7 +375,7 @@ write_sob_bool:
 	mov rbp, rsp
 
 	mov rax, qword [rbp + 8 + 1*8]
-	cmp rax, L_const2
+	cmp rax, [L_const2]
 	je .sobFalse
 	
 	mov rdi, .true
@@ -906,3 +906,4 @@ section .data
 	
 	
 	
+

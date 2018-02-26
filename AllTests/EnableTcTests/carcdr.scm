@@ -1,0 +1,6 @@
+(car '(1 2))
+(car (car '(((7 8) 5 6) 2 3)))
+(car (car (car '(((7 8) 5 6) 2 3))))
+(cdr '(1 2))
+(cdr (cdr (cdr (cdr (cdr '(1 2 3 #t #f #\a #\b #\x53 #\return ))))))
+(cdr (cdr '(1 2 3 #t #f #\a #\b #\x53 #\return )))

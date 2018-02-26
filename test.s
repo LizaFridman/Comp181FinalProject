@@ -16,61 +16,136 @@ L_const2:
 L_const4:
 	dq SOB_TRUE
 L_const6:
-	dq MAKE_LITERAL(T_INTEGER, 6)
-L_const8:
-	MAKE_LITERAL_STRING 104, 101, 108, 108, 111
-L_const15:
-	MAKE_LITERAL_SYMBOL L_const8
-L_const17:
 	dq MAKE_LITERAL(T_INTEGER, 1)
+L_const8:
+	dq MAKE_LITERAL(T_INTEGER, 2)
+L_const10:
+	dq MAKE_LITERAL(T_INTEGER, 3)
+L_const12:
+	dq MAKE_LITERAL(T_CHAR, a)
+L_const14:
+	dq MAKE_LITERAL(T_CHAR, A)
+L_const16:
+	dq MAKE_LITERAL(T_CHAR, CHAR_NEWLINE)
+L_const18:
+	dq MAKE_LITERAL(T_CHAR, '\"')
+L_const20:
+	dq MAKE_LITERAL(T_CHAR, '\')
+L_const22:
+	dq MAKE_LITERAL(T_INTEGER, 4)
+L_const24:
+	dq MAKE_LITERAL_FRACTION(L_const10, L_const22)
+L_const27:
+	dq MAKE_LITERAL(T_INTEGER, 5)
+L_const29:
+	dq MAKE_LITERAL_FRACTION(L_const22, L_const27)
+L_const32:
+	dq MAKE_LITERAL(T_INTEGER, 6)
+L_const34:
+	dq MAKE_LITERAL(T_INTEGER, 7)
+L_const36:
+	dq MAKE_LITERAL_FRACTION(L_const32, L_const34)
+L_const39:
+	dq MAKE_LITERAL_PAIR(L_const10, 1)
+L_const42:
+	dq MAKE_LITERAL_PAIR(L_const8, 39)
+L_const45:
+	dq MAKE_LITERAL_PAIR(L_const6, 42)
+L_const48:
+	dq MAKE_LITERAL_PAIR(L_const22, 1)
+L_const51:
+	dq MAKE_LITERAL_PAIR(L_const10, 48)
+L_const54:
+	dq MAKE_LITERAL_PAIR(L_const51, 1)
+L_const57:
+	dq MAKE_LITERAL_PAIR(L_const8, 1)
+L_const60:
+	dq MAKE_LITERAL_PAIR(L_const6, 57)
+L_const63:
+	dq MAKE_LITERAL_PAIR(L_const60, 54)
+L_const66:
+	dq MAKE_LITERAL(T_INTEGER, 1234)
 section .text
 
 main:
 
-;(seq ((or ((const #f) (or ((const #f) (const #f))) (const 6))) (or ((const hello) (or ((const #f) (const 1)))))))
-;(or ((const #f) (or ((const #f) (const #f))) (const 6)))
-;(const #f)
-	MOV RAX, L_const2
 
-	CMP RAX, L_const2
-	JNE L_orEnd1
-;(or ((const #f) (const #f)))
-;(const #f)
-	MOV RAX, L_const2
-
-	CMP RAX, L_const2
-	JNE L_orEnd2
-;(const #f)
-	MOV RAX, L_const2
-
-L_orEnd2:
-
-	CMP RAX, L_const2
-	JNE L_orEnd1
-;(const 6)
 	MOV RAX, L_const6
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
 
-L_orEnd1:
+	MOV RAX, L_const8
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
 
-;(or ((const hello) (or ((const #f) (const 1)))))
-;(const hello)
-	MOV RAX, L_const15
+	MOV RAX, L_const10
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
 
-	CMP RAX, L_const2
-	JNE L_orEnd3
-;(or ((const #f) (const 1)))
-;(const #f)
-	MOV RAX, L_const2
+	MOV RAX, L_const12
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
 
-	CMP RAX, L_const2
-	JNE L_orEnd4
-;(const 1)
-	MOV RAX, L_const17
+	MOV RAX, L_const14
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
 
-L_orEnd4:
+	MOV RAX, L_const16
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
 
-L_orEnd3:
+	MOV RAX, L_const18
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
 
+	MOV RAX, L_const20
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
+
+	MOV RAX, L_const24
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
+
+	MOV RAX, L_const29
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
+
+	MOV RAX, L_const36
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
+
+	MOV RAX, L_const45
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
+
+	MOV RAX, L_const45
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
+
+	MOV RAX, L_const63
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
+
+	MOV RAX, L_const66
+	PUSH qword [RAX]
+	call write_sob_if_not_void
+	ADD rsp, 1*8
+
+	MOV RAX, L_const12
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8

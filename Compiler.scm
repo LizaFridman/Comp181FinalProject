@@ -199,20 +199,27 @@
 		 (+ 2 mem)))
           ((rational? element)
 	   ;; <index, value, (T_Fraction, num, denum)>
-          (let ((top (float->integer (numerator element)))
-          		(bottom (float->integer (denominator element))))
-             (cond ((and (c-table-contains? table top) (c-table-contains? table bottom)) ;has both ints -> add fraction           
-                		 (cons (append table `((,mem ,element (,T_FRACTION ,(c-table-contains? table top) ,(c-table-contains? table bottom))))) (+ 3 mem)))
-             	   ((c-table-contains? table top)										 ;has only numerator -> add denominator and do again
-             	   		 (add-to-c-table (car (add-to-c-table table bottom mem))
-							 element
-								 (cdr (add-to-c-table table bottom mem))))
-             	   (else																 ;has only maybe the denominator -> add numerator and do again 
-             	   		 (add-to-c-table (car (add-to-c-table table top mem))
-							 element
-								 (cdr (add-to-c-table table top mem)))))))
-
-          
+	   (let* ((top (numerator element))
+		  (bottom (denominator element))
+		  (topIndx (c-table-contains? table top))
+		  (bottomIndx (c-table-contains? table bottom)))
+	     ;;(display (format "Adding T_FRACTION to C-table: ~a Rational? ~a\n" element (rational? element)))
+	     ;;(display (format "Num:~a\nDenum:~a\n" top bottom))
+	     ;;(display (format "Num Index:~a\nDenum Index:~a\n" topIndx bottomIndx))
+             (cond ((and topIndx bottomIndx)
+		    ;;has both ints -> add fraction          
+		    (cons (append table `((,mem ,element
+						(,T_FRACTION ,topIndx ,bottomIndx))))
+			  (+ 3 mem)))
+		   (topIndx										 ;;has only numerator -> add denominator and do again
+		    (add-to-c-table (car (add-to-c-table table bottom mem))
+				    element
+				    (cdr (add-to-c-table table bottom mem))))
+		   (else
+		    ;;has only maybe the denominator -> add numerator and do again 
+		    (add-to-c-table (car (add-to-c-table table top mem))
+				    element
+				    (cdr (add-to-c-table table top mem)))))))
           ((string? element)
 	   ;; <index, value, (T_STRING, length, ASCII-list)>
 	   (cons (append table
@@ -313,6 +320,13 @@
 (define const-label "L_const")
 (define fvar-label "L_global")
 
+(define CHAR_NUL 0)
+(define CHAR_TAB 9)
+(define CHAR_NEWLINE 10)
+(define CHAR_PAGE 12)
+(define CHAR_RETURN 13)
+(define CHAR_SPACE 32)
+
 (define cg-c-table
   (lambda (ct)
     ;;(display (format "Generating C-Table...\n~a\n" ct))
@@ -342,7 +356,7 @@
 			  (cg-T-string (second data) (third data) index))
 			 ((equal? T_SYMBOL type)
 			  (cg-T-symbol (first type-data) index))
-			 ((euqal? T_PAIR type)
+			 ((equal? T_PAIR type)
 			  (cg-T-pair (first type-data) (second type-data) index))
 			 ((equal? T_VECTOR type)
 			  (cg-T-vector (first type-data) (second type-data) index))
@@ -377,10 +391,23 @@
 			     "dq SOB_FALSE")
 		     newLine))))
 
+(define get-T-char-value
+  (lambda (value)
+    (let ((val (char->integer value)))
+      ;;(display (format "Search char value: ~a\nintValue = ~a\n" value val))
+      (cond ((equal? val (char->integer #\newline))
+	     "CHAR_NEWLINE")
+	    ((equal? val (char->integer #\"))
+	     "\'\\\"\'")
+	    ((equal? val (char->integer #\\))
+	     "\'\\\'")
+	    (else (string value))))))
+
 (define cg-T-char
   (lambda (value index)
+    ;;(display (format "c-gen to T_CHAR: ~a\n" value))
     (string-append (make-const-label index)
-		   tab "dq MAKE_LITERAL(T_CHAR, " (number->string value) ")" newLine)))
+		   tab "dq MAKE_LITERAL(T_CHAR, " (get-T-char-value value) ")" newLine)))
 
 (define cg-T-integer
   (lambda (value index)
@@ -388,9 +415,9 @@
 		   tab "dq MAKE_LITERAL(T_INTEGER, " (number->string value) ")" newLine)))
 
 (define cg-T-fraction
-  (lambda (num denum index)
+  (lambda (numIndx denumIndx index)
     (string-append (make-const-label index)
-		   tab "dq MAKE_LITERAL_FRACTION(" (number->string num) ", " (number->string denum) ")" newLine)))
+		   tab "dq MAKE_LITERAL_FRACTION(" const-label (number->string numIndx) ", " const-label (number->string denumIndx) ")" newLine)))
 
 (define append-params
   (lambda (params)
@@ -540,75 +567,76 @@
     ;; After each generation, the value of the generated code is in RAX
     ;; Returns string
     ;;(display (format "Code Gen to ~a\n" pe))
-    (string-append ";" (format "~a" pe) newLine
-		   (cond ((tag? 'const pe)
-			  (cg-const (second pe)))
-			 
-			 ((tag? 'pvar pe)
-			  (cg-pvar pe))
-			 
-			 ((tag? 'bvar pe)
-			 ;;(bvar x major minor)
-			  (cg-bvar (third pe) (forth pe)))
-			 
-			 ((tag? 'fvar pe)
-			  (cg-fvar (second pe)))
-			 
-			 ((tag? 'if3 pe)
-			  ;;(if3 test dit dif)
-			  (let ((test (second pe))
-				(dit (third pe))
-				(dif (forth pe)))
-			    (cg-if3 test dit dif)))
-			 
-			 ((tag? 'or pe)
-			  (cg-or (second pe) (make-label "L_orEnd")))
-			 
-			 ((tag? 'seq pe)
-			  ;;(seq (E1 .. En))
-			  (cg-seq (second pe)))
-	  
-			 ((tag? 'lambda-simple pe)
-			  "")
-			 
-			 ((tag? 'lambda-opt pe)
-			  "")
-			 
-			 ((tag? 'define pe)
-			  ;; (define var value)
-			  (cg-define (cdr pe)))
-			 
-			 ((tag? 'applic pe)
-			  (string-append ";" (format "~a" pe)))
-			 
-			 ((tag? 'tc-applic pe)
-			  (string-append ";" (format "~a" pe)))
-		   
-			 ((tag? 'set pe)
-			  ;;(set! (*var var * *) value)
-			  (let* ((var (second pe))
-				 (value (third pe))
-				 (cg-val (code-gen value)))
-			    (string-append cg-val
-					   (cond ((tag? 'bvar var)
-						  (cg-set-bvar (cdr var)))
-						 ((tag? 'pvar var)
-						  (cg-set-pvar (cdr var)))
-						 ((tag? 'fvar var)
-						  (cg-set-fvar (cdr var)))
-						 (else "Undefined variable type"))
-					   tab "MOV RAX, " sobVoid newLine)))
-			 
-			 ((tag? 'box pe)
-			  "")
-			 
-			 ((tag? 'box-get pe)
-			  "")
-	  
-			 ((tag? 'box-set? pe)
-			  "")
-			 
-			 (else 'Code-Generation-Error!)))))
+    (string-append ;;";" (format "~a\n" pe)
+     newLine
+     (cond ((tag? 'const pe)
+	    (cg-const (second pe)))
+	   
+	   ((tag? 'pvar pe)
+	    (cg-pvar pe))
+	   
+	   ((tag? 'bvar pe)
+	    ;;(bvar x major minor)
+	    (cg-bvar (third pe) (forth pe)))
+	   
+	   ((tag? 'fvar pe)
+	    (cg-fvar (second pe)))
+	   
+	   ((tag? 'if3 pe)
+	    ;;(if3 test dit dif)
+	    (let ((test (second pe))
+		  (dit (third pe))
+		  (dif (forth pe)))
+	      (cg-if3 test dit dif)))
+	   
+	   ((tag? 'or pe)
+	    (cg-or (second pe) (make-label "L_orEnd")))
+	   
+	   ((tag? 'seq pe)
+	    ;;(seq (E1 .. En))
+	    (cg-seq (second pe)))
+	   
+	   ((tag? 'lambda-simple pe)
+	    "")
+	   
+	   ((tag? 'lambda-opt pe)
+	    "")
+	   
+	   ((tag? 'define pe)
+	    ;; (define var value)
+	    (cg-define (second pe) (third pe)))
+	   
+	   ((tag? 'applic pe)
+	    (string-append ";" (format "~a" pe)))
+	   
+	   ((tag? 'tc-applic pe)
+	    (string-append ";" (format "~a" pe)))
+	   
+	   ((tag? 'set pe)
+	    ;;(set! (*var var * *) value)
+	    (let* ((var (second pe))
+		   (value (third pe))
+		   (cg-val (code-gen value)))
+	      (string-append cg-val
+			     (cond ((tag? 'bvar var)
+				    (cg-set-bvar (cdr var)))
+				   ((tag? 'pvar var)
+				    (cg-set-pvar (cdr var)))
+				   ((tag? 'fvar var)
+				    (cg-set-fvar (cdr var)))
+				   (else "Undefined variable type"))
+			     tab "MOV RAX, " sobVoid newLine)))
+	   
+	   ((tag? 'box pe)
+	    "")
+	   
+	   ((tag? 'box-get pe)
+	    "")
+	   
+	   ((tag? 'box-set? pe)
+	    "")
+	   
+	   (else 'Code-Generation-Error!)))))
 
 (define newLine
   (list->string '(#\newline)))
@@ -641,13 +669,7 @@
 	   (index (first row))
 	   (type (first (third row))))
       (string-append ;;".t_" const-label (number->string index) ":" newLine
-		     tab "MOV RAX, " const-label (number->string index)  newLine
-		     ;;(if (equal? T_SYMBOL type)
-		     ;; (string-append
-		     ;;tab "MOV RAX, [RAX]" newLine
-		     ;;tab "MOV RAX, [RAX]" newLine
-		     ;;tab "DATA RAX" newLine
-		     ;;tab "MOV RAX,[RAX]" newLine)
+		     tab "MOV RAX, " const-label (number->string index) newLine
 		     ;;newLine
 		     ;;cg-print-rax)
 		     ))))

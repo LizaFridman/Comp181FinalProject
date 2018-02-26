@@ -1,0 +1,25 @@
+(make-vector 0 #\a)
+(make-vector 5 #\b)
+(make-vector 30 #\7)
+(make-vector 0 #\a)
+(make-vector 0 0)
+(make-vector 1)
+(make-vector 2)
+(make-vector 0 #\x53)
+(make-vector 3 #\a)
+(make-vector 17 0)
+(make-vector 17 33)
+(define koko (make-vector 5 5/7))
+koko
+(define koko (make-vector 3 #\x52))
+koko
+(define truer #t)
+(make-vector 6 truer)
+(define checker (lambda (x y ) (make-vector x y)))
+(define result (checker 10 truer))
+result 
+(vector? result)
+(define result (checker 0 truer))
+result
+(vector? result)
+(vector-length result)
