@@ -606,11 +606,13 @@ write_sob_pair:
 	mov rax, 0
 	mov rdi, .open_paren
 	call printf
+.printCar:
 	mov rax, qword [rbp + 8 + 1*8]
 	CAR rax
 	push rax
 	call write_sob
 	add rsp, 1*8
+.printCdr:
 	mov rax, qword [rbp + 8 + 1*8]
 	CDR rax
 	push rax
@@ -641,27 +643,37 @@ write_sob_pair_on_cdr:
 	TYPE rbx
 	cmp rbx, T_NIL
 	je .done
+	
 	cmp rbx, T_PAIR
 	je .cdrIsPair
+	
 	push rax
+
 	mov rax, 0
 	mov rdi, .dot
 	call printf
+	
 	call write_sob
 	add rsp, 1*8
+
 	jmp .done
 
 .cdrIsPair:
 	mov rbx, rax
+
 	CDR rbx
 	push rbx
+	
 	CAR rax
 	push rax
+
 	mov rax, 0
 	mov rdi, .space
 	call printf
+
 	call write_sob
 	add rsp, 1*8
+
 	call write_sob_pair_on_cdr
 	add rsp, 1*8
 

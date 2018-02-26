@@ -417,6 +417,8 @@
 	     "\'\"\'")
 	    ((equal? val (char->integer #\\))
 	     "\'\\\'")
+	    ((equal? val (char->integer #\tab))
+	     "\'\t\'")
 	    (else (string-append "\'" (string value) "\'"))))))
 
 (define cg-T-char
@@ -563,15 +565,14 @@
 (define cg-f-table
   (lambda (table)
     (fold-left string-append
-               ";; table initialization\n"
                (map (lambda (line)
-                        (string-append
-                         fvar-label (number->string (first line)) ":" newLine ;TODO: change this line to the labels
-                          tab "dq MAKE_LITERAL(T_UNDEFINED, 0)" newLine
-
-                         ))
+		      (string-append
+		       fvar-label (number->string (first line)) ":" newLine ;TODO: change this line to the labels
+		       tab "dq MAKE_LITERAL(T_UNDEFINED, 0)" newLine
+		       
+		       ))
                     table))))
-					
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Code Generation  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define tag?
