@@ -93,9 +93,9 @@
       ;;(display (format "Before c-table...\n"))
       (set! c-table (master-build-c-table pipelined 6))
       ;;(display (format "C-Table:\n~a\n" c-table))
-      (display (format "Before F-Table...\n"))
+      ;;(display (format "Before F-Table...\n"))
       (set! f-table (master-build-f-table pipelined))
-      (display (format "F-Table:\n~a\n" f-table))
+      ;;(display (format "F-Table:\n~a\n" f-table))
       (let* ((pre (generate-pre-text c-table f-table))
 	     (code (create-code-to-run pipelined)))
 	;;(display (format "Pre-Text:\n~a\nCode:\n~b\n" pre code))
@@ -157,7 +157,7 @@
   (lambda (exps test)
     ;;(display (format "Ordering:\nExprs: ~a\n" exps))
     (let ((passed (those-that-pass exps test '())))
-      (display (format "Passed: ~a\n" passed))
+      ;;(display (format "Passed: ~a\n" passed))
       (reverse (those-that-pass exps test '())))))
 
 (define tagged-by-const
@@ -582,7 +582,7 @@
 (define master-build-f-table
   (lambda (exp)
     (let ((extracted (extract-fvars exp)))
-      (display (format "Extracted f-vars: ~a\n" extracted))
+      ;;(display (format "Extracted f-vars: ~a\n" extracted))
 	(master-give-indxes (build-f-table '() extracted)))))
 
 (define cg-f-table
@@ -649,7 +649,7 @@
 	    (cg-define (second pe) (third pe)))
 	   
 	   ((tag? 'applic pe)
-	    (string-append ";" (format "~a" pe) newLine))
+	    (cg-applic (second pe) (cddr pe)))
 	   
 	   ((tag? 'tc-applic pe)
 	    (string-append ";" (format "~a" pe) newLine))
@@ -678,7 +678,8 @@
 	   ((tag? 'box-set? pe)
 	    "")
 	   
-	   (else 'Code-Generation-Error!)))))
+	   (else
+	    (string-append ";; Code-Generation-Error" newLine))))))
 
 (define newLine
   (list->string '(#\newline)))
@@ -749,14 +750,9 @@
 
 (define cg-fvar ;var needs to be the symbol
   (lambda (var)
-    (let ((undefined 0)
-	  (u-label "L_error_undefined_fvar"))
     (string-append
-   ;  tab "MOV RAX, [" (number->string (f-table-get var)) "]" newLine
-   ;  tab "CMP RAX, " undefined newLine
-   ;  tab "JE "u-label newLine
-    tab "MOV RAX, " fvar-label (number->string (f-table-get var))  newLine
-   ))))
+    tab "MOV RAX, " fvar-label (number->string (f-table-get var)) newLine)))
+
 (define sobFalse
   (lambda ()
     (string-append const-label (number->string (c-table-contains? c-table #f)))))
@@ -810,13 +806,64 @@
     (string-append
      tab "MOV qword [" fvar-label (number->string (f-table-get var)) "], RAX" newLine)))
 
+(define cg-push-args
+  (lambda (args)
+    (fold-left (lambda (result arg)
+		 (string-append result
+				(code-gen arg)
+				tab "PUSH rax" newLine))
+	       ""
+	       (reverse args))))
+
+(define cg-pop-args
+  (lambda (args)
+    (fold-left (lambda (result arg)
+		 (string-append result
+				tab "POP rbx" newLine))
+	       ""
+	       args)))
+
+(define applic-T-closure-error-label "L_Applic_closure_error")
+(define error-applic-label "L_error_applic")
+
+(define cg-check-T-closure
+  ;; Rax = generated closure
+  (string-append
+   tab "MOV RAX, qword [RAX]" newLine
+   tab "TYPE rax" newLine
+   tab "CMP rax, T_CLOSURE" newLine
+   tab "JNE " error-applic-label newLine))
+
+(define cg-applic
+  (lambda (proc args)
+    (let ((args-length (length args)))
+      (string-append
+       (cg-push-args args)
+       newLine
+       tab "PUSH " (number->string args-length) newLine
+       newLine
+       (code-gen proc) ;;Rax = Closure value
+       newLine
+       cg-check-T-closure
+       newLine
+       tab "MOV rbx, rax" newLine
+       tab "CLOSURE_ENV rbx" newLine
+       tab "PUSH rbx" newLine
+       tab "CLOSURE_CODE rax" newLine
+       tab "call rax" newLine
+       
+       tab "POP rbx" newLine ;; Closure_Env
+       tab "POP rbx" newLine ;; Args-length
+       (cg-pop-args args);; Pop Arguments
+       ))))
 
 (define cg-define
   (lambda (var value)
     (let ((address (number->string (f-table-get var))))
-    (string-append (code-gen value) newLine
-		   tab "MOV qword [" address "], RAX" newLine
-		   tab "MOV RAX, " sobVoid newLine))))
+      (string-append (code-gen value)
+		     newLine
+		     tab "MOV qword [" fvar-label address "], RAX" newLine
+		     tab "MOV RAX, " sobVoid newLine))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -877,35 +924,47 @@
 		   newLine
 		   "main:" newLine)))
 
-(define p-format "%d")
-
-(define print-register
-  (let ((l-print "print_register"))
-    (string-append "%macro " l-print " 2" newLine
-		   tab "MOV rdi, %2" newLine
-		   tab "MOVzx rsi, %1" newLine
-		   tab "call printf" newLine
-		   "%endmacro" newLine
-     )))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Post-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define l-exit "L_exit")
 
+(define cg-error
+  (lambda (msgPtr)
+    (string-append
+     tab "MOV rax, " msgPtr newLine
+     cg-print-rax)))
+
+(define cg-error-applic
+  (lambda ()
+    (let ((chars (map (lambda (ch)
+			(char->integer ch))
+		      (string->list "Apply argument not a clusure!\n"))))
+      (string-append
+       "section .text" newLine
+       newLine
+       applic-T-closure-error-label ":" newLine
+       (cg-error error-applic-label)
+       newLine
+       "section .data" newLine
+       newLine
+       error-applic-label ":" newLine
+       tab "MAKE_LITERAL_STRING" (append-params chars) newLine
+       newLine
+       "section .text" newLine))))
+
 (define post-text
   ;;(begin
-    ;;(display (format "Generating Epilogue\n"))
-    (string-append l-exit ":" newLine
-		   ;;tab "PUSH RAX" newLine
-		   ;;tab "call write_sob" newLine
-		   tab "ret" newLine));;)
+  ;;(display (format "Generating Epilogue\n"))
+  (string-append
+   (cg-error-applic)
+   l-exit ":" newLine
+   tab "ret" newLine));;)
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Built-in ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Built-in ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 (define built-in-map
-;; <func-name, func-label>
+  ;; <func-name, func-label>
   '((null? null-pred-label)
     (boolean? bool-pred-label)
     (char? char-pred-label)
