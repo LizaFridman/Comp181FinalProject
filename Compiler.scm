@@ -125,6 +125,11 @@
 ;  car passes test          -> save car, remove it and do on the rest
 ;  car is a list            -> open the car and do again
 ;  else                     -> remove car and do on the rest
+
+(define improper-list?
+	(lambda (x)
+		(and (pair? x) (not (list? (last-pair x))))))
+		
 (define those-that-pass
   (lambda (exps test positive-results)
     ;;(display (format "Exps:\n ~a\nResults:\n~a\n" exps positive-results))
@@ -137,6 +142,9 @@
       ;;(display (format "==> Expression ~a Passed test ~a\n" (car exps) test))
       (those-that-pass (cdr exps) test (cons (car exps) positive-results)))
      
+	 ((improper-list? (car exps))
+     	(append (those-that-pass (car exps) test '()) (those-that-pass (cdr exps) test positive-results)))
+	 
      ((pair? (car exps))
 	   ;;(list? (caar exps)))
       (those-that-pass `(,@(car exps) ,@(cdr exps)) test positive-results))
