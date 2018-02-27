@@ -1221,11 +1221,24 @@
   (lambda (var index func-label)
     (string-append
      (malloc 3)
-     tab "" newLine
-     tab "" newLine)))
+     ;;tab "" newLine
+     ;;tab "" newLine
+     )))
 
 (define self-implemented
-  '((define append
+  '((define not
+      (lambda (element)
+	(if element
+	    #f
+	    #t)))
+
+    (define length
+      (lambda (lst)
+	(if (null? lst)
+	    0
+	    (+ 1 (length (cdr lst))))))
+    
+    (define append
       (lambda (lst1 lst2)
 	(cond ((null? lst1)
 	       lst2)
