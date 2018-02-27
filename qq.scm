@@ -21,7 +21,9 @@
   (let ((simple-sexprs-predicates
 	 (list boolean? char? number? string?)))
     (lambda (e)
-      (or (ormap (lambda (p?) (p? e))
+      (or (ormap (lambda (p?)
+		   ;;(display (format "Ormap ~a\n" (p? e)))
+		   (p? e))
 		 simple-sexprs-predicates)
 	  (quote? e)))))
 

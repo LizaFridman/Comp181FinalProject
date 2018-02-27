@@ -52,7 +52,7 @@
     ((star <sexpr>) sexpr
      (lambda (match rest)
        (map (lambda (expr)
-	      (display (format "Pipelining ~a\n" expr))
+	      ;;(display (format "Pipelining ~a\n" expr))
 	      (annotate-tc
 	       (pe->lex-pe
 		(box-set
@@ -89,12 +89,13 @@
     (let* ((exprs (file->list source))
 	   (pipelined (pipeline exprs))
 	   (size (length pipelined)))
-      (display (format "pipelinded = ~a\n" pipelined))
+      ;;(display (format "Pipelined = ~a\n" pipelined))
       ;;(display (format "Before c-table...\n"))
       (set! c-table (master-build-c-table pipelined 6))
       ;;(display (format "C-Table:\n~a\n" c-table))
+      (display (format "Before F-Table...\n"))
       (set! f-table (master-build-f-table pipelined))
-      ;;(display (format "F-Table:\n~a\n" f-table))
+      (display (format "F-Table:\n~a\n" f-table))
       (let* ((pre (generate-pre-text c-table f-table))
 	     (code (create-code-to-run pipelined)))
 	;;(display (format "Pre-Text:\n~a\nCode:\n~b\n" pre code))
@@ -127,23 +128,30 @@
 ;  else                     -> remove car and do on the rest
 (define those-that-pass
   (lambda (exps test positive-results)
+    (display (format "Exps:\n ~a\nResults:\n~a\n" exps positive-results))
     (cond 
      ((or (not (pair? exps))
 	  (null? exps))
       positive-results)
      
      ((test (car exps))
+      ;;(display (format "==> Expression ~a Passed test ~a\n" (car exps) test))
       (those-that-pass (cdr exps) test (cons (car exps) positive-results)))
      
-     ((pair? (car exps)) (those-that-pass `(,@(car exps) ,@(cdr exps)) test positive-results))
+     ((and (pair? (car exps))
+	   (list? (caar exps)))
+      (those-that-pass `(,@(car exps) ,@(cdr exps)) test positive-results))
      
      (else (those-that-pass (cdr exps) test positive-results)))))
+;; returns deep search, returns elements that pass test
+;; TODO: if exps passes test, do not go into the those-that-pass function
 
-					; returns deep search, returns elements that pass test
-					; TODO: if exps passes test, do not go into the those-that-pass function
 (define ordered-those-that-pass
   (lambda (exps test)
-    (reverse (those-that-pass exps test '()))))
+    (display (format "Ordering:\nExprs: ~a\n" exps))
+    (let ((passed (those-that-pass exps test '())))
+      (display (format "Passed: ~a\n" passed))
+      (reverse (those-that-pass exps test '())))))
 
 (define tagged-by-const
   (lambda (exp)
@@ -158,10 +166,15 @@
 
 (define extract-and-topo-sort-consts
   (lambda (exp done)
+    ;;(display (format "Extract & sort consts:\nExp: ~a\nDone: ~a\n" exp done))
     (if (null? exp) 
-      done
-      (extract-and-topo-sort-consts (cdr exp) (append done (reverse (topological-sort (car exp))))
-				    ))))
+	done
+	(let* ((sorted (topological-sort (car exp)))
+	       (reversed (reverse sorted)))
+	  ;;(display (format "Sorted: ~a\nReversed: ~a\n" sorted reversed))
+	  (extract-and-topo-sort-consts (cdr exp)
+					(append done
+						reversed))))))
 
 (define master-const-extract 
   (lambda (exp)
@@ -270,6 +283,7 @@
 
 (define build-c-table-func
   (lambda (table lst mem)
+    ;;(display (format "Building C-Table function:\nTable: ~a\nList: ~a\n" table lst))
     (cond  ((null? lst)
 	    table)
            ((c-table-contains? table (car lst))
@@ -287,21 +301,25 @@
 
 (define build-c-table
   (lambda (lst starting-mem)
-    (build-c-table-func (starting-table (- starting-mem 6)) lst starting-mem)))
-
+    ;;(display (format "Building c-table with:\nLst: ~a\n" lst))
+    (build-c-table-func
+     (starting-table (- starting-mem 6))
+     lst
+     starting-mem)))
 
 (define topological-sort 
-  (lambda (e) 
+  (lambda (e)
+    ;;(display (format "Topological Sort of ~a\n" e))
     (cond 
      ((or (number? e) (string? e) (eq? e (if #f #f)) (null? e) (boolean? e) (char? e) ) `(,e)) 
-      ((pair? e) 
-       `(,e ,@(topological-sort (car e)) ,@(topological-sort (cdr e))))
-      ((vector? e) 
-       `(,e ,@(apply append 
-                     (map topological-sort (vector->list e)))))
-      ((symbol? e)
-       `(,e ,@(topological-sort (symbol->string e))))
-      (else 'topological-sort-error))))
+     ((pair? e) 
+      `(,e ,@(topological-sort (car e)) ,@(topological-sort (cdr e))))
+     ((vector? e) 
+      `(,e ,@(apply append 
+		    (map topological-sort (vector->list e)))))
+     ((symbol? e)
+      `(,e ,@(topological-sort (symbol->string e))))
+     (else 'topological-sort-error))))
 
 (define master-build-c-table
   (lambda (exp mem)
@@ -526,10 +544,11 @@
 
 (define extract-fvars
   (lambda (exp)
+    ;;(display (format "Extracting F-vars from ~a\n" exp))
     (if (tagged-by-fvar exp)
-  (cdr exp)
-  (map (lambda (x) (cadr x))
-       (ordered-those-that-pass exp tagged-by-fvar)))))
+	(cdr exp)
+	(map (lambda (x) (second x))
+	     (ordered-those-that-pass exp tagged-by-fvar)))))
 
 (define f-table-contains?;input is list of fvars, not the final table
   (lambda (table element)
@@ -555,7 +574,9 @@
 
 (define master-build-f-table
   (lambda (exp)
-    (master-give-indxes (build-f-table '() (extract-fvars exp)))))
+    (let ((extracted (extract-fvars exp)))
+      (display (format "Extracted f-vars: ~a\n" extracted))
+	(master-give-indxes (build-f-table '() extracted)))))
 
 (define cg-f-table
   (lambda (table)

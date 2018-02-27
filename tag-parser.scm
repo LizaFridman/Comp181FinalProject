@@ -205,16 +205,15 @@
     (cond ((or (const? sexpr)
 	       (void? sexpr))
 	   (begin
-	     (display (format "Parsing const ~a\n" sexpr))
+	     ;;(display (format "Const or Void ~a\n" sexpr))
 	     (if (quote? sexpr)
-		 ;;(begin
-		   ;;(display (format "Found quote! ~a\n" se))
-		 `(const ,@(cdr sexpr));;)
-		 `(const ,sexpr))))
+	       `(const ,@(cdr sexpr))
+	       `(const ,sexpr))))
 	  
-	  ((variable? sexpr) `(var ,sexpr))
+	  ((variable? sexpr)
+	   `(var ,sexpr))
 	  
-      	  ((if-dit? sexpr) `(if3 ,(parse (cadr sexpr)) 
+	  ((if-dit? sexpr) `(if3 ,(parse (cadr sexpr)) 
 				 ,(parse (caddr sexpr)) 
 				 ,(parse void)))
 	  

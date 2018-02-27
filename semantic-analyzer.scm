@@ -12,7 +12,8 @@
 
 (define applic-lambda-nil?
   (lambda (expr)
-    (and (list? expr)
+    (and (not (null? expr))
+	 (list? expr)
 	 (eq? 'applic (car expr))
 	 (lambda-simple-tag? (cadr expr))
 	 (null? (cadadr expr)))))
@@ -21,15 +22,19 @@
   (lambda (expr)
     ;;(display (format "Removing applic of lambda null for ~a\n" expr))
     (if (applic-lambda-nil? expr)
+
 	(begin
 	  ;;(display (format "~a passed as applic-lambda-nil\n" expr))
 	  (let* ((lambda-simple (cadr expr))
 		 (body (caddr lambda-simple)))
 	    (remove-applic-lambda-nil body)))
-	(if (or (not (list? expr))
-		(not (pair? expr)))
-	    expr
-	    (map remove-applic-lambda-nil expr)))))
+
+	(begin
+	  ;;(display (format "~a DIDN'T passed as applic-lambda-nil\n" expr))
+	  (if (or (not (list? expr))
+		  (not (pair? expr)))
+	      expr
+	      (map remove-applic-lambda-nil expr))))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define mtrx-member
@@ -177,7 +182,9 @@
 
 (define box-set
   (lambda (pe)
-    (cond ((not (pair? pe))
+    ;;(display (format "~a in Box-Set\n" pe))
+    (cond ((or (not (pair? pe))
+	       (not (list? pe)))
 	   pe)
 	  ((lambda-simple-tag? pe)
 	     `(lambda-simple ,(cadr pe) ,(box-lambda (cadr pe) (box-set (caddr pe)))))
@@ -211,7 +218,9 @@
 
 (define lex-pe
   (lambda (pe params env)
-    (cond ((not (pair? pe))
+    ;;(display (format "Lex-pe pe: ~a\nparams ~a\n env = ~a\n" pe params env))
+    (cond ((or (not (pair? pe))
+	       (not (list? pe)))
 	   pe)
 	  ;;Found variable
 	  ((var? pe)
@@ -252,8 +261,8 @@
 
 (define pe->lex-pe
   (lambda (pe)
-    (lex-pe pe '() '())
-    ))
+    (lex-pe pe '() '())))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define tc-last-expr
