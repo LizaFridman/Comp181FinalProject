@@ -76,8 +76,9 @@ gcc -m64 -Wall -o test07 test07.o
 Doing test AllTests/2013-2014Tests/tests/test08.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test08.scm" "test08.s")' | scheme -q
+Compiled Scheme file with 25 parsed expressions!
 nasm -f elf64 test08.s -o test08.o
-Makefile:6: recipe for target 'test08' failed
+gcc -m64 -Wall -o test08 test08.o
 [1;31m *** RESULTS DIFFER in test08 ☹[0m
 *** scheme output: #t
 #t
@@ -120,8 +121,9 @@ Makefile:6: recipe for target 'test09' failed
 Doing test AllTests/2013-2014Tests/tests/test10.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test10.scm" "test10.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 test10.s -o test10.o
-Makefile:6: recipe for target 'test10' failed
+gcc -m64 -Wall -o test10 test10.o
 [1;31m *** RESULTS DIFFER in test10 ☹[0m
 *** scheme output: 120
 *** our output: 
@@ -166,8 +168,9 @@ gcc -m64 -Wall -o test12 test12.o
 Doing test AllTests/2013-2014Tests/tests/test13.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test13.scm" "test13.s")' | scheme -q
+Compiled Scheme file with 21 parsed expressions!
 nasm -f elf64 test13.s -o test13.o
-Makefile:6: recipe for target 'test13' failed
+gcc -m64 -Wall -o test13 test13.o
 [1;31m *** RESULTS DIFFER in test13 ☹[0m
 *** scheme output: (1 . (2 . (3 . ())))
 (1 . (2 . (3 . (4 . ()))))
@@ -234,8 +237,9 @@ Makefile:6: recipe for target 'test14' failed
 Doing test AllTests/2013-2014Tests/tests/test15.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test15.scm" "test15.s")' | scheme -q
+Compiled Scheme file with 17 parsed expressions!
 nasm -f elf64 test15.s -o test15.o
-Makefile:6: recipe for target 'test15' failed
+gcc -m64 -Wall -o test15 test15.o
 [1;31m *** RESULTS DIFFER in test15 ☹[0m
 *** scheme output: #t
 #f
@@ -409,8 +413,9 @@ gcc -m64 -Wall -o 1test14 1test14.o
 Doing test AllTests/2015Tests/tests/1test15.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "1test15.scm" "1test15.s")' | scheme -q
+Compiled Scheme file with 4 parsed expressions!
 nasm -f elf64 1test15.s -o 1test15.o
-Makefile:6: recipe for target '1test15' failed
+gcc -m64 -Wall -o 1test15 1test15.o
 [1;31m *** RESULTS DIFFER in 1test15 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -490,8 +495,9 @@ gcc -m64 -Wall -o 2test14 2test14.o
 Doing test AllTests/2015Tests/tests/2test15.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "2test15.scm" "2test15.s")' | scheme -q
+Compiled Scheme file with 4 parsed expressions!
 nasm -f elf64 2test15.s -o 2test15.o
-Makefile:6: recipe for target '2test15' failed
+gcc -m64 -Wall -o 2test15 2test15.o
 [1;31m *** RESULTS DIFFER in 2test15 ☹[0m
 *** scheme output: #f
 *** our output: 
@@ -1020,8 +1026,9 @@ gcc -m64 -Wall -o 34test14 34test14.o
 Doing test AllTests/2015Tests/tests/a4.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a4.scm" "a4.s")' | scheme -q
+Compiled Scheme file with 51 parsed expressions!
 nasm -f elf64 a4.s -o a4.o
-Makefile:6: recipe for target 'a4' failed
+gcc -m64 -Wall -o a4 a4.o
 [1;31m *** RESULTS DIFFER in a4 ☹[0m
 *** scheme output: "Hello world!"
 *** our output: 
@@ -1030,8 +1037,9 @@ Makefile:6: recipe for target 'a4' failed
 Doing test AllTests/2015Tests/tests/a6.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a6.scm" "a6.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 a6.s -o a6.o
-Makefile:6: recipe for target 'a6' failed
+gcc -m64 -Wall -o a6 a6.o
 [1;31m *** RESULTS DIFFER in a6 ☹[0m
 *** scheme output: (1 . (2 . (4 . 5)))
 *** our output: 
@@ -1040,8 +1048,9 @@ Makefile:6: recipe for target 'a6' failed
 Doing test AllTests/2015Tests/tests/a7.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a7.scm" "a7.s")' | scheme -q
+Compiled Scheme file with 14 parsed expressions!
 nasm -f elf64 a7.s -o a7.o
-Makefile:6: recipe for target 'a7' failed
+gcc -m64 -Wall -o a7 a7.o
 [1;31m *** RESULTS DIFFER in a7 ☹[0m
 *** scheme output: #4(1 2 3 4)
 *** our output: 
@@ -1050,8 +1059,9 @@ Makefile:6: recipe for target 'a7' failed
 Doing test AllTests/2015Tests/tests/a8.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a8.scm" "a8.s")' | scheme -q
+Compiled Scheme file with 51 parsed expressions!
 nasm -f elf64 a8.s -o a8.o
-Makefile:6: recipe for target 'a8' failed
+gcc -m64 -Wall -o a8 a8.o
 [1;31m *** RESULTS DIFFER in a8 ☹[0m
 *** scheme output: "Hello world!"
 *** our output: 
@@ -1060,8 +1070,9 @@ Makefile:6: recipe for target 'a8' failed
 Doing test AllTests/2015Tests/tests/a9.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a9.scm" "a9.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 a9.s -o a9.o
-Makefile:6: recipe for target 'a9' failed
+gcc -m64 -Wall -o a9 a9.o
 [1;31m *** RESULTS DIFFER in a9 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1070,8 +1081,9 @@ Makefile:6: recipe for target 'a9' failed
 Doing test AllTests/2015Tests/tests/a10.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a10.scm" "a10.s")' | scheme -q
+Compiled Scheme file with 35 parsed expressions!
 nasm -f elf64 a10.s -o a10.o
-Makefile:6: recipe for target 'a10' failed
+gcc -m64 -Wall -o a10 a10.o
 [1;31m *** RESULTS DIFFER in a10 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1080,8 +1092,9 @@ Makefile:6: recipe for target 'a10' failed
 Doing test AllTests/2015Tests/tests/a11.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a11.scm" "a11.s")' | scheme -q
+Compiled Scheme file with 35 parsed expressions!
 nasm -f elf64 a11.s -o a11.o
-Makefile:6: recipe for target 'a11' failed
+gcc -m64 -Wall -o a11 a11.o
 [1;31m *** RESULTS DIFFER in a11 ☹[0m
 *** scheme output: #f
 *** our output: 
@@ -1090,8 +1103,9 @@ Makefile:6: recipe for target 'a11' failed
 Doing test AllTests/2015Tests/tests/a12.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a12.scm" "a12.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 a12.s -o a12.o
-Makefile:6: recipe for target 'a12' failed
+gcc -m64 -Wall -o a12 a12.o
 [1;31m *** RESULTS DIFFER in a12 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1100,8 +1114,9 @@ Makefile:6: recipe for target 'a12' failed
 Doing test AllTests/2015Tests/tests/a13.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a13.scm" "a13.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 a13.s -o a13.o
-Makefile:6: recipe for target 'a13' failed
+gcc -m64 -Wall -o a13 a13.o
 [1;31m *** RESULTS DIFFER in a13 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1110,8 +1125,9 @@ Makefile:6: recipe for target 'a13' failed
 Doing test AllTests/2015Tests/tests/a14.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a14.scm" "a14.s")' | scheme -q
+Compiled Scheme file with 51 parsed expressions!
 nasm -f elf64 a14.s -o a14.o
-Makefile:6: recipe for target 'a14' failed
+gcc -m64 -Wall -o a14 a14.o
 [1;31m *** RESULTS DIFFER in a14 ☹[0m
 *** scheme output: (7 . (8 . (9 . ())))
 *** our output: 
@@ -1120,8 +1136,9 @@ Makefile:6: recipe for target 'a14' failed
 Doing test AllTests/2015Tests/tests/a15.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a15.scm" "a15.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 a15.s -o a15.o
-Makefile:6: recipe for target 'a15' failed
+gcc -m64 -Wall -o a15 a15.o
 [1;31m *** RESULTS DIFFER in a15 ☹[0m
 *** scheme output: 3
 *** our output: 
@@ -1130,8 +1147,9 @@ Makefile:6: recipe for target 'a15' failed
 Doing test AllTests/2015Tests/tests/a17.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a17.scm" "a17.s")' | scheme -q
+Compiled Scheme file with 51 parsed expressions!
 nasm -f elf64 a17.s -o a17.o
-Makefile:6: recipe for target 'a17' failed
+gcc -m64 -Wall -o a17 a17.o
 [1;31m *** RESULTS DIFFER in a17 ☹[0m
 *** scheme output: "HELLO WORLD!"
 *** our output: 
@@ -1140,8 +1158,9 @@ Makefile:6: recipe for target 'a17' failed
 Doing test AllTests/2015Tests/tests/a18.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a18.scm" "a18.s")' | scheme -q
+Compiled Scheme file with 51 parsed expressions!
 nasm -f elf64 a18.s -o a18.o
-Makefile:6: recipe for target 'a18' failed
+gcc -m64 -Wall -o a18 a18.o
 [1;31m *** RESULTS DIFFER in a18 ☹[0m
 *** scheme output: "hello world!"
 *** our output: 
@@ -1150,8 +1169,9 @@ Makefile:6: recipe for target 'a18' failed
 Doing test AllTests/2015Tests/tests/a19.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a19.scm" "a19.s")' | scheme -q
+Compiled Scheme file with 5 parsed expressions!
 nasm -f elf64 a19.s -o a19.o
-Makefile:6: recipe for target 'a19' failed
+gcc -m64 -Wall -o a19 a19.o
 [1;31m *** RESULTS DIFFER in a19 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1160,8 +1180,9 @@ Makefile:6: recipe for target 'a19' failed
 Doing test AllTests/2015Tests/tests/a20.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a20.scm" "a20.s")' | scheme -q
+Compiled Scheme file with 16 parsed expressions!
 nasm -f elf64 a20.s -o a20.o
-Makefile:6: recipe for target 'a20' failed
+gcc -m64 -Wall -o a20 a20.o
 [1;31m *** RESULTS DIFFER in a20 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1170,8 +1191,9 @@ Makefile:6: recipe for target 'a20' failed
 Doing test AllTests/2015Tests/tests/a21.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a21.scm" "a21.s")' | scheme -q
+Compiled Scheme file with 16 parsed expressions!
 nasm -f elf64 a21.s -o a21.o
-Makefile:6: recipe for target 'a21' failed
+gcc -m64 -Wall -o a21 a21.o
 [1;31m *** RESULTS DIFFER in a21 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1180,8 +1202,9 @@ Makefile:6: recipe for target 'a21' failed
 Doing test AllTests/2015Tests/tests/a22.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a22.scm" "a22.s")' | scheme -q
+Compiled Scheme file with 18 parsed expressions!
 nasm -f elf64 a22.s -o a22.o
-Makefile:6: recipe for target 'a22' failed
+gcc -m64 -Wall -o a22 a22.o
 [1;31m *** RESULTS DIFFER in a22 ☹[0m
 *** scheme output: #\V
 *** our output: 
@@ -1190,6 +1213,7 @@ Makefile:6: recipe for target 'a22' failed
 Doing test AllTests/2015Tests/tests/a23.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "a23.scm" "a23.s")' | scheme -q
+Compiled Scheme file with 51 parsed expressions!
 nasm -f elf64 a23.s -o a23.o
 Makefile:6: recipe for target 'a23' failed
 [1;31m *** RESULTS DIFFER in a23 ☹[0m
@@ -1200,8 +1224,9 @@ Makefile:6: recipe for target 'a23' failed
 Doing test AllTests/2015Tests/tests/fact-x.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "fact-x.scm" "fact-x.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 fact-x.s -o fact-x.o
-Makefile:6: recipe for target 'fact-x' failed
+gcc -m64 -Wall -o fact-x fact-x.o
 [1;31m *** RESULTS DIFFER in fact-x ☹[0m
 *** scheme output: 120
 *** our output: 
@@ -1263,8 +1288,9 @@ Makefile:6: recipe for target 'test09' failed
 Doing test AllTests/2015Tests/tests/test10.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test10.scm" "test10.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 test10.s -o test10.o
-Makefile:6: recipe for target 'test10' failed
+gcc -m64 -Wall -o test10 test10.o
 [1;31m *** RESULTS DIFFER in test10 ☹[0m
 *** scheme output: 120
 *** our output: 
@@ -1284,8 +1310,9 @@ gcc -m64 -Wall -o test11 test11.o
 Doing test AllTests/2015Tests/tests/torture-test-for-compiler-00.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-00.scm" "torture-test-for-compiler-00.s")' | scheme -q
+Compiled Scheme file with 24 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-00.s -o torture-test-for-compiler-00.o
-Makefile:6: recipe for target 'torture-test-for-compiler-00' failed
+gcc -m64 -Wall -o torture-test-for-compiler-00 torture-test-for-compiler-00.o
 [1;31m *** RESULTS DIFFER in torture-test-for-compiler-00 ☹[0m
 *** scheme output: "-"
 "1"
@@ -1313,8 +1340,9 @@ gcc -m64 -Wall -o torture-test-for-compiler-01 torture-test-for-compiler-01.o
 Doing test AllTests/2015Tests/tests/torture-test-for-compiler-02.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-02.scm" "torture-test-for-compiler-02.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-02.s -o torture-test-for-compiler-02.o
-Makefile:6: recipe for target 'torture-test-for-compiler-02' failed
+gcc -m64 -Wall -o torture-test-for-compiler-02 torture-test-for-compiler-02.o
 [1;31m *** RESULTS DIFFER in torture-test-for-compiler-02 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1323,8 +1351,9 @@ Makefile:6: recipe for target 'torture-test-for-compiler-02' failed
 Doing test AllTests/2015Tests/tests/torture-test-for-compiler-06.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-06.scm" "torture-test-for-compiler-06.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-06.s -o torture-test-for-compiler-06.o
-Makefile:6: recipe for target 'torture-test-for-compiler-06' failed
+gcc -m64 -Wall -o torture-test-for-compiler-06 torture-test-for-compiler-06.o
 [1;31m *** RESULTS DIFFER in torture-test-for-compiler-06 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1355,8 +1384,9 @@ gcc -m64 -Wall -o torture-test-for-compiler-07 torture-test-for-compiler-07.o
 Doing test AllTests/2015Tests/tests/torture-test-for-compiler-008.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-008.scm" "torture-test-for-compiler-008.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-008.s -o torture-test-for-compiler-008.o
-Makefile:6: recipe for target 'torture-test-for-compiler-008' failed
+gcc -m64 -Wall -o torture-test-for-compiler-008 torture-test-for-compiler-008.o
 [1;31m *** RESULTS DIFFER in torture-test-for-compiler-008 ☹[0m
 *** scheme output: 120
 *** our output: 
@@ -1365,8 +1395,9 @@ Makefile:6: recipe for target 'torture-test-for-compiler-008' failed
 Doing test AllTests/2015Tests/tests/torture-test-for-compiler-09.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-09.scm" "torture-test-for-compiler-09.s")' | scheme -q
+Compiled Scheme file with 6 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-09.s -o torture-test-for-compiler-09.o
-Makefile:6: recipe for target 'torture-test-for-compiler-09' failed
+gcc -m64 -Wall -o torture-test-for-compiler-09 torture-test-for-compiler-09.o
 [1;31m *** RESULTS DIFFER in torture-test-for-compiler-09 ☹[0m
 *** scheme output: (3628800 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . ()))))))))))))
 *** our output: 
@@ -1375,8 +1406,9 @@ Makefile:6: recipe for target 'torture-test-for-compiler-09' failed
 Doing test AllTests/2016Tests/tests/fact-x.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "fact-x.scm" "fact-x.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 fact-x.s -o fact-x.o
-Makefile:6: recipe for target 'fact-x' failed
+gcc -m64 -Wall -o fact-x fact-x.o
 [1;31m *** RESULTS DIFFER in fact-x ☹[0m
 *** scheme output: 120
 *** our output: 
@@ -1501,8 +1533,9 @@ Makefile:6: recipe for target 'tests2' failed
 Doing test AllTests/2016Tests/tests/tests3.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "tests3.scm" "tests3.s")' | scheme -q
+Compiled Scheme file with 41 parsed expressions!
 nasm -f elf64 tests3.s -o tests3.o
-Makefile:6: recipe for target 'tests3' failed
+gcc -m64 -Wall -o tests3 tests3.o
 [1;31m *** RESULTS DIFFER in tests3 ☹[0m
 *** scheme output: (5 . 4)
 97
@@ -1539,8 +1572,9 @@ a
 Doing test AllTests/2016Tests/tests/tests4.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "tests4.scm" "tests4.s")' | scheme -q
+Compiled Scheme file with 11 parsed expressions!
 nasm -f elf64 tests4.s -o tests4.o
-Makefile:6: recipe for target 'tests4' failed
+gcc -m64 -Wall -o tests4 tests4.o
 [1;31m *** RESULTS DIFFER in tests4 ☹[0m
 *** scheme output: hello
 70
@@ -1558,6 +1592,7 @@ Makefile:6: recipe for target 'tests4' failed
 Doing test AllTests/2016Tests/tests/tests5.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "tests5.scm" "tests5.s")' | scheme -q
+Compiled Scheme file with 22 parsed expressions!
 nasm -f elf64 tests5.s -o tests5.o
 Makefile:6: recipe for target 'tests5' failed
 [1;31m *** RESULTS DIFFER in tests5 ☹[0m
@@ -1587,6 +1622,7 @@ acc
 Doing test AllTests/2016Tests/tests/tests6.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "tests6.scm" "tests6.s")' | scheme -q
+Compiled Scheme file with 30 parsed expressions!
 nasm -f elf64 tests6.s -o tests6.o
 Makefile:6: recipe for target 'tests6' failed
 [1;31m *** RESULTS DIFFER in tests6 ☹[0m
@@ -1637,8 +1673,9 @@ gcc -m64 -Wall -o torture-test-for-compiler-01 torture-test-for-compiler-01.o
 Doing test AllTests/2016Tests/tests/torture-test-for-compiler-02.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-02.scm" "torture-test-for-compiler-02.s")' | scheme -q
+Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-02.s -o torture-test-for-compiler-02.o
-Makefile:6: recipe for target 'torture-test-for-compiler-02' failed
+gcc -m64 -Wall -o torture-test-for-compiler-02 torture-test-for-compiler-02.o
 [1;31m *** RESULTS DIFFER in torture-test-for-compiler-02 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1668,24 +1705,27 @@ gcc -m64 -Wall -o torture-test-for-compiler-005 torture-test-for-compiler-005.o
 Doing test AllTests/2016Tests/tests/torture-test-for-compiler-05.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-05.scm" "torture-test-for-compiler-05.s")' | scheme -q
+Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-05.s -o torture-test-for-compiler-05.o
-Makefile:6: recipe for target 'torture-test-for-compiler-05' failed
+gcc -m64 -Wall -o torture-test-for-compiler-05 torture-test-for-compiler-05.o
 [1;32mTest torture-test-for-compiler-05 Passed ☺ [0m
 --------------------------------
 
 Doing test AllTests/2016Tests/tests/torture-test-for-compiler-006.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-006.scm" "torture-test-for-compiler-006.s")' | scheme -q
+Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-006.s -o torture-test-for-compiler-006.o
-Makefile:6: recipe for target 'torture-test-for-compiler-006' failed
+gcc -m64 -Wall -o torture-test-for-compiler-006 torture-test-for-compiler-006.o
 [1;32mTest torture-test-for-compiler-006 Passed ☺ [0m
 --------------------------------
 
 Doing test AllTests/2016Tests/tests/torture-test-for-compiler-06.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-06.scm" "torture-test-for-compiler-06.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-06.s -o torture-test-for-compiler-06.o
-Makefile:6: recipe for target 'torture-test-for-compiler-06' failed
+gcc -m64 -Wall -o torture-test-for-compiler-06 torture-test-for-compiler-06.o
 [1;31m *** RESULTS DIFFER in torture-test-for-compiler-06 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1697,7 +1737,9 @@ echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-007.
 Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-007.s -o torture-test-for-compiler-007.o
 gcc -m64 -Wall -o torture-test-for-compiler-007 torture-test-for-compiler-007.o
-[1;32mTest torture-test-for-compiler-007 Passed ☺ [0m
+[1;31m *** RESULTS DIFFER in torture-test-for-compiler-007 ☹[0m
+*** scheme output: #t
+*** our output: 
 --------------------------------
 
 Doing test AllTests/2016Tests/tests/torture-test-for-compiler-07.scm:
@@ -1714,8 +1756,9 @@ gcc -m64 -Wall -o torture-test-for-compiler-07 torture-test-for-compiler-07.o
 Doing test AllTests/2016Tests/tests/torture-test-for-compiler-008.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-008.scm" "torture-test-for-compiler-008.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-008.s -o torture-test-for-compiler-008.o
-Makefile:6: recipe for target 'torture-test-for-compiler-008' failed
+gcc -m64 -Wall -o torture-test-for-compiler-008 torture-test-for-compiler-008.o
 [1;32mTest torture-test-for-compiler-008 Passed ☺ [0m
 --------------------------------
 
@@ -1733,8 +1776,9 @@ gcc -m64 -Wall -o torture-test-for-compiler-08 torture-test-for-compiler-08.o
 Doing test AllTests/2016Tests/tests/torture-test-for-compiler-09.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-09.scm" "torture-test-for-compiler-09.s")' | scheme -q
+Compiled Scheme file with 5 parsed expressions!
 nasm -f elf64 torture-test-for-compiler-09.s -o torture-test-for-compiler-09.o
-Makefile:6: recipe for target 'torture-test-for-compiler-09' failed
+gcc -m64 -Wall -o torture-test-for-compiler-09 torture-test-for-compiler-09.o
 [1;31m *** RESULTS DIFFER in torture-test-for-compiler-09 ☹[0m
 *** scheme output: (3628800 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . ()))))))))))))
 *** our output: 
@@ -1759,8 +1803,9 @@ gcc -m64 -Wall -o torture-test-for-compiler-unsorted torture-test-for-compiler-u
 Doing test AllTests/ChloucheTests/tests/mayer_fact-x.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "mayer_fact-x.scm" "mayer_fact-x.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 mayer_fact-x.s -o mayer_fact-x.o
-Makefile:6: recipe for target 'mayer_fact-x' failed
+gcc -m64 -Wall -o mayer_fact-x mayer_fact-x.o
 [1;31m *** RESULTS DIFFER in mayer_fact-x ☹[0m
 *** scheme output: 120
 *** our output: 
@@ -1791,8 +1836,9 @@ gcc -m64 -Wall -o mayer_test01 mayer_test01.o
 Doing test AllTests/ChloucheTests/tests/mayer_test02.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "mayer_test02.scm" "mayer_test02.s")' | scheme -q
+Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 mayer_test02.s -o mayer_test02.o
-Makefile:6: recipe for target 'mayer_test02' failed
+gcc -m64 -Wall -o mayer_test02 mayer_test02.o
 [1;31m *** RESULTS DIFFER in mayer_test02 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -1844,8 +1890,9 @@ gcc -m64 -Wall -o mayer_test08 mayer_test08.o
 Doing test AllTests/ChloucheTests/tests/mayer_test09.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "mayer_test09.scm" "mayer_test09.s")' | scheme -q
+Compiled Scheme file with 5 parsed expressions!
 nasm -f elf64 mayer_test09.s -o mayer_test09.o
-Makefile:6: recipe for target 'mayer_test09' failed
+gcc -m64 -Wall -o mayer_test09 mayer_test09.o
 [1;31m *** RESULTS DIFFER in mayer_test09 ☹[0m
 *** scheme output: (3628800 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . ()))))))))))))
 *** our output: 
@@ -2021,9 +2068,7 @@ echo '(load "Compiler.scm") (compile-scheme-file "test10.scm" "test10.s")' | sch
 Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test10.s -o test10.o
 gcc -m64 -Wall -o test10 test10.o
-[1;31m *** RESULTS DIFFER in test10 ☹[0m
-*** scheme output: 
-*** our output: #<void>
+[1;32mTest test10 Passed ☺ [0m
 --------------------------------
 
 Doing test AllTests/ChloucheTests/tests/test11.scm:
@@ -2140,25 +2185,26 @@ gcc -m64 -Wall -o test24 test24.o
 Doing test AllTests/ChloucheTests/tests/test25.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test25.scm" "test25.s")' | scheme -q
+Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test25.s -o test25.o
-Makefile:6: recipe for target 'test25' failed
+gcc -m64 -Wall -o test25 test25.o
 [1;32mTest test25 Passed ☺ [0m
 --------------------------------
 
 Doing test AllTests/ChloucheTests/tests/test30.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test30.scm" "test30.s")' | scheme -q
+Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test30.s -o test30.o
-Makefile:6: recipe for target 'test30' failed
+gcc -m64 -Wall -o test30 test30.o
 [1;32mTest test30 Passed ☺ [0m
 --------------------------------
 
 Doing test AllTests/ChloucheTests/tests/test31.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test31.scm" "test31.s")' | scheme -q
-Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test31.s -o test31.o
-gcc -m64 -Wall -o test31 test31.o
+Makefile:6: recipe for target 'test31' failed
 [1;31m *** RESULTS DIFFER in test31 ☹[0m
 *** scheme output: 1
 *** our output: 
@@ -2297,8 +2343,9 @@ gcc -m64 -Wall -o test102 test102.o
 Doing test AllTests/ChloucheTests/tests/test103.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test103.scm" "test103.s")' | scheme -q
+Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test103.s -o test103.o
-Makefile:6: recipe for target 'test103' failed
+gcc -m64 -Wall -o test103 test103.o
 [1;31m *** RESULTS DIFFER in test103 ☹[0m
 *** scheme output: (1 . (2 . (3 . (1 . (2 . 3)))))
 *** our output: 
@@ -2307,8 +2354,9 @@ Makefile:6: recipe for target 'test103' failed
 Doing test AllTests/ChloucheTests/tests/test104.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test104.scm" "test104.s")' | scheme -q
+Compiled Scheme file with 6 parsed expressions!
 nasm -f elf64 test104.s -o test104.o
-Makefile:6: recipe for target 'test104' failed
+gcc -m64 -Wall -o test104 test104.o
 [1;31m *** RESULTS DIFFER in test104 ☹[0m
 *** scheme output: (1 . (2 . ($ . (4 . ()))))
 *** our output: 
@@ -2350,8 +2398,9 @@ gcc -m64 -Wall -o test109 test109.o
 Doing test AllTests/ChloucheTests/tests/test114.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test114.scm" "test114.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 test114.s -o test114.o
-Makefile:6: recipe for target 'test114' failed
+gcc -m64 -Wall -o test114 test114.o
 [1;31m *** RESULTS DIFFER in test114 ☹[0m
 *** scheme output: 120
 *** our output: 
@@ -2360,8 +2409,9 @@ Makefile:6: recipe for target 'test114' failed
 Doing test AllTests/ChloucheTests/tests/test115.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test115.scm" "test115.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 test115.s -o test115.o
-Makefile:6: recipe for target 'test115' failed
+gcc -m64 -Wall -o test115 test115.o
 [1;31m *** RESULTS DIFFER in test115 ☹[0m
 *** scheme output: 16
 *** our output: 
@@ -2370,8 +2420,9 @@ Makefile:6: recipe for target 'test115' failed
 Doing test AllTests/ChloucheTests/tests/test116.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test116.scm" "test116.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 test116.s -o test116.o
-Makefile:6: recipe for target 'test116' failed
+gcc -m64 -Wall -o test116 test116.o
 [1;31m *** RESULTS DIFFER in test116 ☹[0m
 *** scheme output: 16
 *** our output: 
@@ -2380,8 +2431,9 @@ Makefile:6: recipe for target 'test116' failed
 Doing test AllTests/ChloucheTests/tests/test117.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test117.scm" "test117.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 test117.s -o test117.o
-Makefile:6: recipe for target 'test117' failed
+gcc -m64 -Wall -o test117 test117.o
 [1;31m *** RESULTS DIFFER in test117 ☹[0m
 *** scheme output: 17
 *** our output: 
@@ -2544,9 +2596,8 @@ gcc -m64 -Wall -o test131 test131.o
 Doing test AllTests/ChloucheTests/tests/test132.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test132.scm" "test132.s")' | scheme -q
-Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test132.s -o test132.o
-gcc -m64 -Wall -o test132 test132.o
+Makefile:6: recipe for target 'test132' failed
 [1;31m *** RESULTS DIFFER in test132 ☹[0m
 *** scheme output: 0
 *** our output: 
@@ -2698,9 +2749,8 @@ gcc -m64 -Wall -o test145 test145.o
 Doing test AllTests/ChloucheTests/tests/test146.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test146.scm" "test146.s")' | scheme -q
-Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test146.s -o test146.o
-gcc -m64 -Wall -o test146 test146.o
+Makefile:6: recipe for target 'test146' failed
 [1;31m *** RESULTS DIFFER in test146 ☹[0m
 *** scheme output: 1
 *** our output: 
@@ -3008,7 +3058,7 @@ Doing test AllTests/ChloucheTests/tests/test174.scm:
 echo '(load "Compiler.scm") (compile-scheme-file "test174.scm" "test174.s")' | scheme -q
 Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test174.s -o test174.o
-Makefile:6: recipe for target 'test174' failed
+gcc -m64 -Wall -o test174 test174.o
 [1;31m *** RESULTS DIFFER in test174 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -3118,7 +3168,7 @@ Doing test AllTests/ChloucheTests/tests/test186.scm:
 echo '(load "Compiler.scm") (compile-scheme-file "test186.scm" "test186.s")' | scheme -q
 Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test186.s -o test186.o
-Makefile:6: recipe for target 'test186' failed
+gcc -m64 -Wall -o test186 test186.o
 [1;31m *** RESULTS DIFFER in test186 ☹[0m
 *** scheme output: #t
 *** our output: 
@@ -3270,9 +3320,8 @@ gcc -m64 -Wall -o test205 test205.o
 Doing test AllTests/ChloucheTests/tests/test206.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test206.scm" "test206.s")' | scheme -q
-Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test206.s -o test206.o
-gcc -m64 -Wall -o test206 test206.o
+Makefile:6: recipe for target 'test206' failed
 [1;31m *** RESULTS DIFFER in test206 ☹[0m
 *** scheme output: ()
 *** our output: 
@@ -3733,6 +3782,7 @@ gcc -m64 -Wall -o test254 test254.o
 Doing test AllTests/ChloucheTests/tests/test255.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test255.scm" "test255.s")' | scheme -q
+Compiled Scheme file with 2 parsed expressions!
 nasm -f elf64 test255.s -o test255.o
 Makefile:6: recipe for target 'test255' failed
 [1;31m *** RESULTS DIFFER in test255 ☹[0m
@@ -3842,9 +3892,8 @@ gcc -m64 -Wall -o test265 test265.o
 Doing test AllTests/ChloucheTests/tests/test266.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test266.scm" "test266.s")' | scheme -q
-Compiled Scheme file with 1 parsed expressions!
 nasm -f elf64 test266.s -o test266.o
-gcc -m64 -Wall -o test266 test266.o
+Makefile:6: recipe for target 'test266' failed
 [1;31m *** RESULTS DIFFER in test266 ☹[0m
 *** scheme output: #0()
 *** our output: 

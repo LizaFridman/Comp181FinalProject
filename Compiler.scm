@@ -565,15 +565,21 @@
 
 (define f-table-add 
   (lambda (table element)
-    (if (f-table-contains? table element) table (append table (list element)))))
+    (if (f-table-contains? table element)
+	table
+	(append table (list element)))))
 
 (define build-f-table
   (lambda (table lst)
-    (if (null? lst) table (build-f-table (f-table-add table (car lst)) (cdr lst)))))
+    (if (null? lst)
+	table
+	(build-f-table (f-table-add table (car lst)) (cdr lst)))))
 
 (define give-indxes
   (lambda (after before indx)
-    (if (null? before) after (give-indxes (cons (list indx (car before)) after) (cdr before) (+ 1 indx)))))
+    (if (null? before)
+	after
+	(give-indxes (cons (list indx (car before)) after) (cdr before) (+ 1 indx)))))
 
 (define master-give-indxes ;needs a list - not a single element
   (lambda (lst)
@@ -835,10 +841,10 @@
 ;;; Box
 
 (define malloc
-  (lambda (sizeInBytes)
+  (lambda (size)
     (string-append
      tab "PUSH rdi" newLine
-     tab "MOV rdi, " (number->string sizeInBytes) newLine
+     tab "MOV rdi, " (number->string (* size 8)) newLine
      tab "call malloc" newLine
      tab "POP rdi" newLine)))
 
@@ -854,7 +860,7 @@
      tab "PUSH rsi" newLine
      newLine
      tab "MOV rbx, rax" newLine
-     (malloc 8)
+     (malloc 1)
      tab "MOV qword [rax], rbx" newLine
      newLine
      tab "POP rsi" newLine
@@ -1002,6 +1008,7 @@
 		   newLine
 		   "section .bss" newLine
 		   "global main" newLine
+		   "extern malloc" newLine
 		   newLine
 		   "section .data" newLine
 		   "start_of_data:" newLine
@@ -1010,9 +1017,9 @@
 		   newLine
 		   (cg-c-table ct)
 		   newLine
-		 ;;(cg-built-in-closures (filter (lambda (row)
-		 ;;				   (built-in? (first row)))
-		 ;;				 f-table))
+		   ;;(cg-built-in-closures (filter (lambda (row)
+		   ;;(built-in? (second row)))
+		   ;;f-table))
 		   "section .text" newLine
 		   newLine
 		   "main:" newLine)))
@@ -1082,16 +1089,27 @@
   (lambda ()
     (string-append
      cg-null?
+     newLine
      cg-bool?
+     newLine
      cg-char?
+     newLine
      cg-integer?
+     newLine
      cg-number?
+     newLine
      cg-rational?
+     newLine
      cg-pair?
+     newLine
      cg-string?
+     newLine
      cg-symbol?
+     newLine
      cg-vector?
-     cg-closure?)))
+     newLine
+     cg-closure?
+     newLine)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Type Checks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1193,15 +1211,18 @@
     (fold-left string-append
 	       ""
 	       (map (lambda (row)
-		      (create-built-in-closure (first row)
-					       (second row)
-					       (second (assoc (first row) built-in-map))))
+		      (let ((var (second row))
+			    (index (first row))
+			    (label (second (assoc (second row) built-in-map))))
+			(create-built-in-closure var index label)))
 		    rows-to-create))))
 
 (define create-built-in-closure
-  (lambda (var value func-label)
+  (lambda (var index func-label)
     (string-append
-     "Create Closure for " var)))
+     (malloc 3)
+     tab "" newLine
+     tab "" newLine)))
 
 (define self-implemented
   '((define append

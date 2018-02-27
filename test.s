@@ -2,6 +2,7 @@
 
 section .bss
 global main
+extern malloc
 
 section .data
 start_of_data:
