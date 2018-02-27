@@ -943,7 +943,7 @@ section .data
 section .text
 write_sob_if_not_void:
 	mov rax, qword [rsp + 1*8]
-	cmp rax, L_const0
+	cmp rax, [L_const0]
 	je .continue
 
 	push rax

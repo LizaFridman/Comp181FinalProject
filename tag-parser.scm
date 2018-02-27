@@ -34,11 +34,11 @@
 
 (define or?
   (lambda (expr)
-    (and (list? expr) (eq? 'or (car expr)))))
+    (and (pair? expr) (eq? 'or (car expr)))))
 
 (define lambda?
   (lambda (expr)
-    (and (lambda? expr) (eq? 'lambda (car expr)) (>= (length expr) 3))))
+    (and (pair? expr) (eq? 'lambda (car expr)) (>= (length expr) 3))))
 
 (define lambda-simple?
   (lambda (expr)
@@ -204,11 +204,10 @@
     ;;(display (format "Parsing ~a\n" sexpr))
     (cond ((or (const? sexpr)
 	       (void? sexpr))
-	   (begin
-	     ;;(display (format "Const or Void ~a\n" sexpr))
-	     (if (quote? sexpr)
+	   ;;(display (format "Const or Void ~a\n" sexpr))
+	   (if (quote? sexpr)
 	       `(const ,@(cdr sexpr))
-	       `(const ,sexpr))))
+	       `(const ,sexpr)))
 	  
 	  ((variable? sexpr)
 	   `(var ,sexpr))
@@ -225,7 +224,7 @@
 	  ((single-or? sexpr) (parse (cadr sexpr)))
       	  ((or? sexpr) 
 	   `(or (,@(map parse (cdr sexpr)))))
-
+	  
 	  ((applic? sexpr)
 	   `(applic ,(parse (car sexpr)) (,@(map parse
 						 (cdr sexpr)))))

@@ -557,7 +557,7 @@
 	(map (lambda (x) (second x))
 	     (ordered-those-that-pass exp tagged-by-fvar)))))
 
-(define f-table-contains?;input is list of fvars, not the final table
+(define f-table-contains? ;input is list of fvars, not the final table
   (lambda (table element)
     (cond ((null? table) #f)
           ((equal? (car table) element) element)
@@ -587,14 +587,14 @@
 
 (define cg-f-table
   (lambda (table)
+    ;;(display (format "Generating code for f-table:\n~a\n" table))
     (fold-left string-append
 	       ""
                (map (lambda (line)
+		      ;;(display (format "Handling line ~a\n" line))
 		      (string-append
 		       fvar-label (number->string (first line)) ":" newLine
-		       tab "dq MAKE_LITERAL(T_UNDEFINED, 0)" newLine
-		       
-		       ))
+		       tab "dq MAKE_LITERAL(T_UNDEFINED, 0)" newLine))
                     table))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Code Generation  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -610,7 +610,6 @@
     ;; Returns string
     ;;(display (format "Code Gen to ~a\n" pe))
     (string-append ;;";" (format "~a\n" pe)
-     newLine
      (cond ((tag? 'const pe)
 	    (cg-const (second pe)))
 	   
@@ -645,10 +644,11 @@
 	    "")
 	   
 	   ((tag? 'define pe)
-	    ;; (define var value)
-	    (cg-define (second pe) (third pe)))
+	    ;; (define (*var var) value)
+	    (cg-define (second (second pe)) (third pe)))
 	   
-	   ((tag? 'applic pe)
+	   ((or (tag? 'applic pe)
+		(tag? 'tc-applic pe))
 	    (cg-applic (second pe) (cddr pe)))
 	   
 	   ((tag? 'tc-applic pe)
@@ -666,20 +666,37 @@
 				    (cg-set-pvar (cdr var)))
 				   ((tag? 'fvar var)
 				    (cg-set-fvar (cdr var)))
-				   (else "Undefined variable type"))
-			     tab "MOV RAX, " sobVoid newLine)))
+				   (else
+				    (string-append
+				     "Undefined set variable"
+				     newLine)))
+			     tab "MOV rax, " sobVoid newLine)))
 	   
 	   ((tag? 'box pe)
-	    "")
+	    (cg-box (second pe)))
 	   
 	   ((tag? 'box-get pe)
-	    "")
+	    (cg-box-get (second pe)))
 	   
-	   ((tag? 'box-set? pe)
-	    "")
-	   
+	   ((tag? 'box-set pe)
+	    ;;(box-set! (*var var * *) value)
+	    (let ((var (second pe))
+		  (value (third pe))
+		  (cg-value (code-gen value)))
+	      (string-append cg-value
+			     (cond ((tag? 'bvar var)
+				    (cg-box-set-bvar (cdr var)))
+				   ((tag? 'pvar var)
+				    (cg-box-set-pvar (cdr var)))
+				   ((tag? 'fvar var)
+				    (cg-box-set-fvar (cdr var)))
+				   (else
+				    (string-append
+				     "Undefined box-set variable type"
+				     newLine)))
+			     tab "MOV rax, sobVoid" newLine)))
 	   (else
-	    (string-append ";; Code-Generation-Error" newLine))))))
+	    (string-append ";;Code-Generation-Error" newLine))))))
 
 (define newLine
   (list->string '(#\newline)))
@@ -696,6 +713,7 @@
 
 (define cg-print-rax
   (string-append
+   newLine
    tab "PUSH qword [RAX]" newLine
    tab "call write_sob_if_not_void" newLine
    tab "ADD rsp, 1*8" newLine))
@@ -705,6 +723,8 @@
    tab "PUSH RAX" newLine
    tab "call write_sob_symbol" newLine
    tab "ADD rsp, 1*8" newLine))
+
+;;; Const
 
 (define cg-const
   (lambda (const)
@@ -717,6 +737,7 @@
 		     ;;cg-print-rax)
 		     ))))
 
+;;; Or
 
 (define cg-or
   (lambda (lst end-label)
@@ -734,6 +755,7 @@
 			      newLine
 			      tab "JNE " end-label newLine
 			      (cg-or (cdr lst) end-label)))))))
+;;; Vars
 
 (define cg-pvar
   (lambda (pe)
@@ -752,6 +774,8 @@
   (lambda (var)
     (string-append
     tab "MOV RAX, " fvar-label (number->string (f-table-get var)) newLine)))
+
+;;; If3
 
 (define sobFalse
   (lambda ()
@@ -777,7 +801,8 @@
 		     dif-cg newLine
 		     l-end ":" newLine
 		     ))))
-    
+;;; Seq
+
 (define cg-seq
   (lambda (pe)
     (fold-left (lambda (result e)
@@ -785,14 +810,15 @@
 		 (string-append result (code-gen e) newLine))
 	       ""
 	       pe)))
+;;; Set
 
 (define cg-set-bvar
   (lambda (var major minor)
     (string-append
-     tab "MOV RBX, qword [rbp + 2*8]" newLine
-     tab "MOV RBX, qword [RBX + " major "*8]" newLine
-     tab "MOV RBX, qword [RBX + " minor "*8]" newLine
-     tab "MOV qword [RBX], RAX" newLine)))
+     tab "MOV rbx, qword [rbp + 2*8]" newLine
+     tab "MOV rbx, qword [rbx + " major "*8]" newLine
+     tab "MOV rbx, qword [rbx + " minor "*8]" newLine
+     tab "MOV qword [rbx], rax" newLine)))
 
 (define cg-set-pvar
   (lambda (var minor)
@@ -805,6 +831,68 @@
   (lambda (var)
     (string-append
      tab "MOV qword [" fvar-label (number->string (f-table-get var)) "], RAX" newLine)))
+
+;;; Box
+
+(define malloc
+  (lambda (sizeInBytes)
+    (string-append
+     tab "PUSH rdi" newLine
+     tab "MOV rdi, " (number->string sizeInBytes) newLine
+     tab "call malloc" newLine
+     tab "POP rdi" newLine)))
+
+(define cg-box
+  ;; Rax = address of var
+  (lambda (var)
+    (string-append
+     (code-gen var) ;; Rax - var
+     tab "PUSH rbx" newLine
+     tab "PUSH rcx" newLine
+     tab "PUSH rdx" newLine
+     tab "PUSH rbp" newLine
+     tab "PUSH rsi" newLine
+     newLine
+     tab "MOV rbx, rax" newLine
+     (malloc 8)
+     tab "MOV qword [rax], rbx" newLine
+     newLine
+     tab "POP rsi" newLine
+     tab "POP rbp" newLine
+     tab "POP rdx" newLine
+     tab "POP rcx" newLine
+     tab "POP rbx" newLine
+     )))
+
+(define cg-box-get
+  (lambda (var)
+    (string-append
+     (code-gen var) ;; Rax = var value
+     tab "MOV rax, [rax]" newLine ;; Unbox
+     )))
+
+(define cg-box-set-bvar
+  (lambda (var major minor)
+    (string-append
+     tab "MOV rbx, qword [rbp + 2*8]" newLine
+     tab "MOV rbx, qword [rbx + " major "*8]" newLine
+     tab "MOV rbx, qword [rbx + " minor "*8]" newLine
+     tab "MOV qword [rbx], rax" newLine
+     )))
+
+(define cg-box-set-pvar
+  (lambda (var minor)
+    (string-append
+     tab "MOV rbx, [rbp + " (+ 4 minor) "*8]" newLine
+     tab "MOV [rbx], rax" newLine)))
+
+(define cg-box-set-fvar
+  (lambda (var-name)
+    (string-append
+     tab "MOV rbx, [" fvar-label (number->string (f-table-get var-name)) "]" newLine
+     tab "MOV [rbx], rax" newLine)))
+
+;;; Applic
 
 (define cg-push-args
   (lambda (args)
@@ -857,9 +945,14 @@
        (cg-pop-args args);; Pop Arguments
        ))))
 
+;;; Define
+
 (define cg-define
   (lambda (var value)
+    ;;(display (format "f-table::\n~a\n" f-table))
+    ;;(display (format "cg-define:\nVar = ~a\nValue = ~a\n" var value))
     (let ((address (number->string (f-table-get var))))
+      ;;(display (format "Address for (~a ~a) is ~a\n" var value address))
       (string-append (code-gen value)
 		     newLine
 		     tab "MOV qword [" fvar-label address "], RAX" newLine
@@ -940,10 +1033,11 @@
 			(char->integer ch))
 		      (string->list "Apply argument not a clusure!\n"))))
       (string-append
-       "section .text" newLine
        newLine
        applic-T-closure-error-label ":" newLine
        (cg-error error-applic-label)
+       newLine
+       tab "JMP " l-exit newLine
        newLine
        "section .data" newLine
        newLine
@@ -956,9 +1050,9 @@
   ;;(begin
   ;;(display (format "Generating Epilogue\n"))
   (string-append
-   (cg-error-applic)
    l-exit ":" newLine
-   tab "ret" newLine));;)
+   tab "ret" newLine
+   (cg-error-applic)));;)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Built-in ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
