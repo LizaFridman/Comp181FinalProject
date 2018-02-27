@@ -128,7 +128,7 @@
 ;  else                     -> remove car and do on the rest
 (define those-that-pass
   (lambda (exps test positive-results)
-    (display (format "Exps:\n ~a\nResults:\n~a\n" exps positive-results))
+    ;;(display (format "Exps:\n ~a\nResults:\n~a\n" exps positive-results))
     (cond 
      ((or (not (pair? exps))
 	  (null? exps))
@@ -138,8 +138,8 @@
       ;;(display (format "==> Expression ~a Passed test ~a\n" (car exps) test))
       (those-that-pass (cdr exps) test (cons (car exps) positive-results)))
      
-     ((and (pair? (car exps))
-	   (list? (caar exps)))
+     ((pair? (car exps))
+	   ;;(list? (caar exps)))
       (those-that-pass `(,@(car exps) ,@(cdr exps)) test positive-results))
      
      (else (those-that-pass (cdr exps) test positive-results)))))
@@ -148,7 +148,7 @@
 
 (define ordered-those-that-pass
   (lambda (exps test)
-    (display (format "Ordering:\nExprs: ~a\n" exps))
+    ;;(display (format "Ordering:\nExprs: ~a\n" exps))
     (let ((passed (those-that-pass exps test '())))
       (display (format "Passed: ~a\n" passed))
       (reverse (those-that-pass exps test '())))))
