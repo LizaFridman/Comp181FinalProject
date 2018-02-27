@@ -149,7 +149,7 @@
 	mov %1, qword [%1]
 %endmacro
 
-%macro PUSHA
+%macro PUSHA 0
 	PUSH rax
 	PUSH rbx
 	PUSH rcx
@@ -159,7 +159,7 @@
 	PUSH rdi
 %endmacro
 
-%macro POPA
+%macro POPA 0
 	POP rdi
 	POP rsi
 	POP rbp

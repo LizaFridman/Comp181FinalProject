@@ -100,7 +100,6 @@
 	     (code (create-code-to-run pipelined)))
 	;;(display (format "Pre-Text:\n~a\nCode:\n~b\n" pre code))
 	(list->file (string->list (string-append pre
-						 newLine
 						 code
 						 post-text))
 		  dest)
@@ -642,10 +641,10 @@
 	    (cg-define (second pe) (third pe)))
 	   
 	   ((tag? 'applic pe)
-	    (string-append ";" (format "~a" pe)))
+	    (string-append ";" (format "~a" pe) newLine))
 	   
 	   ((tag? 'tc-applic pe)
-	    (string-append ";" (format "~a" pe)))
+	    (string-append ";" (format "~a" pe) newLine))
 	   
 	   ((tag? 'set pe)
 	    ;;(set! (*var var * *) value)
@@ -860,7 +859,9 @@
 		   "start_of_data:" newLine
 		   newLine
 		   (cg-f-table ft)
+		   newLine
 		   (cg-c-table ct)
+		   newLine
 		 ;;(cg-built-in-closures (filter (lambda (row)
 		 ;;				   (built-in? (first row)))
 		 ;;				 f-table))

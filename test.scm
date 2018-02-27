@@ -18,7 +18,7 @@
 (string? '#(a b c))
 (string? 1234)
 (= 3 (vector-length '#(a #t ())))
-(pair? '(a . b))
+
 (pair? '())
 (zero? 0)
 (zero? 234)
