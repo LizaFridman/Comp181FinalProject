@@ -66,9 +66,14 @@
 	push rax
 	push rbx
 	mov rax, %1
-	mov qword [rax], %2 - start_of_data
+	;mov qword [rax], %2 - start_of_data
+	mov qword [rax], %2
+    sub qword [rax], start_of_data
+	
 	shl qword [rax], ((WORD_SIZE - TYPE_BITS) >> 1)
-	lea rbx, [rax + 8 - start_of_data]
+	;lea rbx, [rax + 8 - start_of_data]
+	lea rbx, [rax + 8]
+	sub rbx, start_of_data
 	or qword [rax], rbx
 	shl qword [rax], TYPE_BITS
 	or qword [rax], T_CLOSURE

@@ -644,7 +644,7 @@
 	    (cg-seq (second pe)))
 	   
 	   ((tag? 'lambda-simple pe)
-	    "")
+	    (cg-lambda-simple pe))
 	   
 	   ((tag? 'lambda-opt pe)
 	    "")
@@ -964,6 +964,98 @@
 		     tab "MOV qword [" fvar-label address "], RAX" newLine
 		     tab "MOV RAX, " sobVoid newLine))))
 
+(define lexical_env 0)
+
+	(define cg-lambda-simple
+    (lambda (pe)
+        (set! lexical_env (+ lexical_env 1))
+            (let* ((args (cadr pe)) (body (caddr pe))
+            	  (skip_code_label (make-label "skip_code")) (for_copy_args (make-label "for_copy_args")) (end_of_copy_args (make-label "end_of_copy_args"))
+            	  (for_copy_envs (make-label "for_copy_envs")) (end_of_copy_envs (make-label "end_of_copy_envs")) (code_label (make-label "code")) (new_env (make-label "new_env"))
+                  (str-gen (string-append
+                  	
+                 
+                  	;create new env
+                  	"mov rbx, 0\n";env
+                    "mov rax, " (number->string lexical_env) "\n";major
+                    "cmp rax, 0\n"
+                    "je "end_of_copy_envs"\n"
+                    "mov rdi, "(number->string (* 8 (+ 1 lexical_env)))"\n";for allocating space for new extended env 
+                    "call malloc\n"
+                    "mov rbx, rax\n"	;rbx = malloc(8*(n+1)) *this is x*
+                    
+                    "mov rax, arg_count\n"
+					"mov rdi, 8\n"
+					"mul rdi\n"
+                    "push rbx\n"	;save value of rbx 
+                    "mov rdi, rax\n"
+                    "call malloc\n"
+                    "pop rbx\n"
+                    "mov rcx, rax\n"	;rcx = malloc(8*m) *params of lambda*
+
+                    ;copy arguments into rcx
+					"mov rdi, 0\n"
+					for_copy_args":\n"
+					"cmp rdi, arg_count\n"
+					"je "end_of_copy_args"\n"
+					"mov rax, 8\n"
+					"mul rdi\n"
+					"mov rdx, An(rdi)\n"   ; rdx = i'th argument
+					"mov qword [rcx+rax], rdx\n" ; copy arg i into [rcx+8*i]
+					"inc rdi\n"
+					"jmp "for_copy_args"\n"
+					end_of_copy_args":\n"
+
+					"mov qword [rbx], rcx\n"
+
+					"mov r14, env\n"		; rdx=previous env
+					"cmp r14, 0\n"
+					"je "end_of_copy_envs"\n"
+					"mov rdi, 0\n"
+					for_copy_envs":\n"
+					"cmp rdi, " (number->string lexical_env) "\n"
+					"je "end_of_copy_envs"\n"
+					"mov rax, 8\n"
+					"mul rdi\n"
+					"mov rcx, qword [r14+rax]\n" ; rcx = i'th env
+					"mov qword [rbx+rax+8], rcx\n" ; copy env i into [rbx+8*i+8]
+					"inc rdi\n"
+					"jmp "for_copy_envs"\n"
+					end_of_copy_envs":\n"
+
+                    ;create target
+                    "push rbx\n"
+                    "push rcx\n"
+                    "mov rdi, 16\n"
+                    "call malloc\n" ;rax = malloc(8*2)
+                    "pop rcx\n"
+                    "pop rbx\n"
+
+                    "push rdx\n"
+                    "mov rdx, "code_label "\n"
+                   ; "MAKE_LITERAL_CLOSURE rax, rbx, "code_label "\n"
+                   "MAKE_LITERAL_CLOSURE rax, rbx, rdx \n"
+                    "pop rdx\n"
+
+                    "jmp "skip_code_label"\n"
+					;create code
+					code_label":\n"
+					"push rbp\n"
+					"mov rbp, rsp\n"
+					(code-gen body)
+					"mov rbx, rax\n"
+					"mov rax, arg_count\n"
+					"add rax, 1\n"
+					"mov rdi, 8\n"
+					"mul rdi\n"
+					"add rsp, rax\n"
+					"mov rax, rbx\n"
+					"leave\n"
+					"ret\n"
+					skip_code_label":\n")))
+        		(set! lexical_env (- lexical_env 1)) 
+        		str-gen)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -987,9 +1079,9 @@
 		       "endstruc" newLine
 		       newLine
 		       "%define old_rbp param(scmframe.old_rbp)" newLine
-		       "%define ret_addr param(scmframe.ret_addr))" newLine
+		       "%define ret_addr param(scmframe.ret_addr)" newLine
 		       "%define env param(scmframe.env)" newLine
-		       "%define arg_count param(scmframe.arg_count))" newLine
+		       "%define arg_count param(scmframe.arg_count)" newLine
 		       "%define A0 param(scmframe.A0)" newLine
 		       "%define A1 param(scmframe.A1)" newLine
 		       "%define A2 param(scmframe.A2)" newLine
