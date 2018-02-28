@@ -929,6 +929,7 @@
      tab "TYPE rax" newLine
      tab "CMP rax, T_CLOSURE" newLine
      tab "JE " continue-label newLine
+     tab "POP rbx" newLine
      tab "MOV rax, " error-applic-label newLine
      cg-print-rax
      tab "JMP L_exit" newLine)))
@@ -1186,7 +1187,10 @@
   ;;(display (format "Generating Epilogue\n"))
   (string-append
    l-exit ":" newLine
-   tab "ret" newLine));;)
+   tab "MOV rax, 60" newLine
+   tab "MOV rdi, 0" newLine
+   tab "syscall" newLine))
+   ;;tab "ret" newLine));;)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Built-in ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

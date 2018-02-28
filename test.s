@@ -176,6 +176,7 @@ skip_code1:
 	TYPE rax
 	CMP rax, T_CLOSURE
 	JE .not2_check_passed
+	POP rbx
 	MOV rax, L_error_applic
 
 	PUSH qword [RAX]
@@ -209,6 +210,7 @@ skip_code1:
 	TYPE rax
 	CMP rax, T_CLOSURE
 	JE .not1_check_passed
+	POP rbx
 	MOV rax, L_error_applic
 
 	PUSH qword [RAX]
@@ -238,4 +240,6 @@ skip_code1:
 	call write_sob_if_not_void
 	ADD rsp, 1*8
 L_exit:
-	ret
+	MOV rax, 60
+	MOV rdi, 0
+	syscall
