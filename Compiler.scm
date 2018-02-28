@@ -90,7 +90,7 @@
 	   (built-in (file->list "Built-in.scm"))
 	   (pipelined (pipeline (append built-in exprs)))
 	   (size (length pipelined)))
-      ;;(display (format "Pipelined = ~a\n" pipelined))
+      (display (format "Pipelined = ~a\n" pipelined))
       ;;(display (format "Before c-table...\n"))
       (set! c-table (master-build-c-table pipelined 6))
       ;;(display (format "C-Table:\n~a\n" c-table))
@@ -985,10 +985,11 @@
 		     tab "mov rax, " (number->string lexical_env) newLine;major
 		     tab "cmp rax, 0" newLine
 		     tab "je " end_of_copy_envs newLine
+		     newLine
 		     tab "mov rdi, "(number->string (* 8 (+ 1 lexical_env))) newLine;for allocating space for new extended env 
 		     tab "call malloc" newLine
 		     tab "mov rbx, rax"	newLine ;;rbx = malloc(8*(n+1)) *this is x*
-                    
+		     newLine
 		     tab "mov rax, arg_count" newLine
 		     tab "mov rdi, 8" newLine
 		     tab "mul rdi" newLine
@@ -999,67 +1000,75 @@
 		     tab "mov rcx, rax"	newLine
 		     ;;rcx = malloc(8*m) *params of lambda*
 		     ;;copy arguments into rcx
+		     newLine
 		     tab "mov rdi, 0" newLine
 		     for_copy_args":" newLine
 		     tab "cmp rdi, arg_count" newLine
 		     tab "je " end_of_copy_args newLine
+		     newLine
 		     tab "mov rax, 8" newLine
 		     tab "mul rdi" newLine
 		     tab "mov rdx, An(rdi)" newLine  ; rdx = i'th argument
 		     tab "mov qword [rcx+rax], rdx" newLine ;; copy arg i into [rcx+8*i]
+		     newLine
 		     tab "inc rdi" newLine
 		     tab " jmp "for_copy_args newLine
+		     newLine
 		     tab end_of_copy_args":" newLine
-
-					"mov qword [rbx], rcx\n"
-
-					"mov r14, env\n"		; rdx=previous env
-					"cmp r14, 0\n"
-					"je "end_of_copy_envs"\n"
-					"mov rdi, 0\n"
-					for_copy_envs":\n"
-					"cmp rdi, " (number->string lexical_env) "\n"
-					"je "end_of_copy_envs"\n"
-					"mov rax, 8\n"
-					"mul rdi\n"
-					"mov rcx, qword [r14+rax]\n" ; rcx = i'th env
-					"mov qword [rbx+rax+8], rcx\n" ; copy env i into [rbx+8*i+8]
-					"inc rdi\n"
-					"jmp "for_copy_envs"\n"
-					end_of_copy_envs":\n"
-
-                    ;create target
-                    "push rbx\n"
-                    "push rcx\n"
-                    "mov rdi, 16\n"
-                    "call malloc\n" ;rax = malloc(8*2)
-                    "pop rcx\n"
-                    "pop rbx\n"
-
-                    "push rdx\n"
-                    "mov rdx, "code_label "\n"
+		     tab "mov qword [rbx], rcx" newLine
+		     tab "mov r14, env"	newLine	;; rdx=previous env
+		     tab "cmp r14, 0" newLine
+		     tab "je "end_of_copy_envs"\n"
+		     tab "mov rdi, 0\n"
+		     newLine
+		     tab for_copy_envs":\n"
+		     tab "cmp rdi, " (number->string lexical_env) "\n"
+		     tab "je "end_of_copy_envs"\n"
+		     newLine
+		     tab "mov rax, 8\n"
+		     tab "mul rdi\n"
+		     tab "mov rcx, qword [r14+rax]\n" ; rcx = i'th env
+		     tab "mov qword [rbx+rax+8], rcx\n" ; copy env i into [rbx+8*i+8]
+		     tab "inc rdi\n"
+		     tab "jmp "for_copy_envs"\n"
+		     newLine
+		     tab end_of_copy_envs":\n"
+		     ;;create target
+		     tab "push rbx\n"
+		     tab "push rcx\n"
+		     tab "mov rdi, 16\n"
+		     tab "call malloc\n" ;rax = malloc(8*2)
+		     tab "pop rcx\n"
+		     tab "pop rbx\n"
+		     newLine
+		     tab "push rdx\n"
+		     tab "mov rdx, "code_label "\n"
                    ; "MAKE_LITERAL_CLOSURE rax, rbx, "code_label "\n"
-                   "MAKE_LITERAL_CLOSURE rax, rbx, rdx \n"
-                    "pop rdx\n"
+		     tab "MAKE_LITERAL_CLOSURE rax, rbx, rdx \n"
+		     tab "pop rdx\n"
 
-                    "jmp "skip_code_label"\n"
-					;create code
-					code_label":\n"
-					"push rbp\n"
-					"mov rbp, rsp\n"
-					(code-gen body)
-					"mov rbx, rax\n"
-					"mov rax, arg_count\n"
-					"add rax, 1\n"
-					"mov rdi, 8\n"
-					"mul rdi\n"
-					"add rsp, rax\n"
-					"mov rax, rbx\n"
-					"leave\n"
-					"ret\n"
-					skip_code_label":\n")))
-        		(set! lexical_env (- lexical_env 1)) 
-        		str-gen)))
+		     tab "jmp "skip_code_label"\n"
+		     newLine
+		     ;;create code
+		     tab code_label":\n"
+		     tab "push rbp\n"
+		     tab "mov rbp, rsp\n"
+		     newLine
+		     tab (code-gen body)
+		     tab "mov rbx, rax\n"
+		     tab "mov rax, arg_count\n"
+		     tab "add rax, 1\n"
+		     tab "mov rdi, 8\n"
+		     tab "mul rdi\n"
+		     tab "add rsp, rax\n"
+		     tab "mov rax, rbx\n"
+		     newLine
+		     tab "leave\n"
+		     tab "ret\n"
+		     newLine
+		     tab skip_code_label":\n")))
+      (set! lexical_env (- lexical_env 1)) 
+      str-gen)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1346,16 +1355,19 @@
 (define create-built-in-closure
   (lambda (var index func-label)
     (string-append
-     tab "MOV rdi, 16" newLine
-     tab "call malloc" newLine
+     tab "MOV rdi, 16" newLine 
+     tab "call malloc" newLine ;; Env = 8 * num_of_vars
      tab "MOV rbx, rax" newLine
      tab "PUSH rbx" newLine
      newLine
      tab "MOV rdi, 8" newLine
-     tab "call malloc" newLine
+     tab "call malloc" newLine ;; Body-code label
      tab "POP rbx" newLine ;;rax=malloc(8), rbx=malloc(16)
      tab "MOV rdx, " func-label newLine
-     tab "MAKE_LITERAL_CLOSURE rax, rbx, rdx" newLine)))
+     tab "MAKE_LITERAL_CLOSURE rax, rbx, rdx" newLine
+     tab "MOV rbx, " fvar-label (number->string index) newLine
+     tab "MOV [rbx], rax" newLine
+     newLine)))
 
 (define self-implemented
   '((define not
@@ -1363,22 +1375,22 @@
 	(if element
 	    #f
 	    #t)))
-
-    ;;(define +
-     ;; (letrec ((loop
-                ;;(lambda (s)
-                 ;; (if (null? s)
-                   ;;   0
-                    ;;  (bin+ (car s)
-                     ;;       (loop (cdr s)))))))
-    ;;(lambda s (loop s))))
     
     (define +
-      (lambda args
-	(if (null? args)
-	    0
-	    (b+ (first args)
-		(+ (cdr args))))))
+      (letrec ((loop
+                (lambda (s)
+		  (if (null? s)
+		      0
+                      (bin+ (car s)
+			    (loop (cdr s)))))))
+	(lambda s (loop s))))
+    
+    ;;(define +
+    ;;(lambda args
+    ;;	(if (null? args)
+    ;;	    0
+    ;;	    (b+ (first args)
+    ;;		(+ (cdr args))))))
     
     (define length
       (lambda (lst)
