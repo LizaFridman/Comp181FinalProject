@@ -1,5 +1,35 @@
 %include "scheme.s"
 
+;;; Parameter Getters
+
+%define param(offset) qword [rbp + offset]
+
+struc scmframe
+.old_rbp: resq 1
+.ret_addr: resq 1
+.env: resq 1
+.arg_count: resq 1
+.A0: resq 1
+.A1: resq 1
+.A2: resq 1
+.A3: resq 1
+.A4: resq 1
+.A5: resq 1
+endstruc
+
+%define old_rbp param(scmframe.old_rbp)
+%define ret_addr param(scmframe.ret_addr)
+%define env param(scmframe.env)
+%define arg_count param(scmframe.arg_count)
+%define A0 param(scmframe.A0)
+%define A1 param(scmframe.A1)
+%define A2 param(scmframe.A2)
+%define A3 param(scmframe.A3)
+%define A4 param(scmframe.A4)
+%define A5 param(scmframe.A5)
+%define An(n) qword [rbp + 8*(n+4)]
+
+
 section .bss
 global main
 extern malloc
@@ -54,32 +84,32 @@ L_const8:
 section .text
 
 main:
-mov rbx, 0
-mov rax, 1
-cmp rax, 0
-je end_of_copy_envs32
-mov rdi, 16
-call malloc
-mov rbx, rax
-mov rax, arg_count
-mov rdi, 8
-mul rdi
-push rbx
-mov rdi, rax
-call malloc
-pop rbx
-mov rcx, rax
-mov rdi, 0
+	mov rbx, 0
+	mov rax, 1
+	cmp rax, 0
+	je end_of_copy_envs32
+	mov rdi, 16
+	call malloc
+	mov rbx, rax
+	mov rax, arg_count
+	mov rdi, 8
+	mul rdi
+	push rbx
+	mov rdi, rax
+	call malloc
+	pop rbx
+	mov rcx, rax
+	mov rdi, 0
 for_copy_args29:
-cmp rdi, arg_count
-je end_of_copy_args30
-mov rax, 8
-mul rdi
-mov rdx, An(rdi)
-mov qword [rcx+rax], rdx
-inc rdi
-jmp for_copy_args29
-end_of_copy_args30:
+	cmp rdi, arg_count
+	je end_of_copy_args30
+	mov rax, 8
+	mul rdi
+	mov rdx, An(rdi)
+	mov qword [rcx+rax], rdx
+	inc rdi
+	 jmp for_copy_args29
+	end_of_copy_args30:
 mov qword [rbx], rcx
 mov r14, env
 cmp r14, 0
@@ -145,32 +175,32 @@ skip_code28:
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8
-mov rbx, 0
-mov rax, 1
-cmp rax, 0
-je end_of_copy_envs14
-mov rdi, 16
-call malloc
-mov rbx, rax
-mov rax, arg_count
-mov rdi, 8
-mul rdi
-push rbx
-mov rdi, rax
-call malloc
-pop rbx
-mov rcx, rax
-mov rdi, 0
+	mov rbx, 0
+	mov rax, 1
+	cmp rax, 0
+	je end_of_copy_envs14
+	mov rdi, 16
+	call malloc
+	mov rbx, rax
+	mov rax, arg_count
+	mov rdi, 8
+	mul rdi
+	push rbx
+	mov rdi, rax
+	call malloc
+	pop rbx
+	mov rcx, rax
+	mov rdi, 0
 for_copy_args11:
-cmp rdi, arg_count
-je end_of_copy_args12
-mov rax, 8
-mul rdi
-mov rdx, An(rdi)
-mov qword [rcx+rax], rdx
-inc rdi
-jmp for_copy_args11
-end_of_copy_args12:
+	cmp rdi, arg_count
+	je end_of_copy_args12
+	mov rax, 8
+	mul rdi
+	mov rdx, An(rdi)
+	mov qword [rcx+rax], rdx
+	inc rdi
+	 jmp for_copy_args11
+	end_of_copy_args12:
 mov qword [rbx], rcx
 mov r14, env
 cmp r14, 0
@@ -267,32 +297,32 @@ skip_code10:
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8
-mov rbx, 0
-mov rax, 1
-cmp rax, 0
-je end_of_copy_envs23
-mov rdi, 16
-call malloc
-mov rbx, rax
-mov rax, arg_count
-mov rdi, 8
-mul rdi
-push rbx
-mov rdi, rax
-call malloc
-pop rbx
-mov rcx, rax
-mov rdi, 0
+	mov rbx, 0
+	mov rax, 1
+	cmp rax, 0
+	je end_of_copy_envs23
+	mov rdi, 16
+	call malloc
+	mov rbx, rax
+	mov rax, arg_count
+	mov rdi, 8
+	mul rdi
+	push rbx
+	mov rdi, rax
+	call malloc
+	pop rbx
+	mov rcx, rax
+	mov rdi, 0
 for_copy_args20:
-cmp rdi, arg_count
-je end_of_copy_args21
-mov rax, 8
-mul rdi
-mov rdx, An(rdi)
-mov qword [rcx+rax], rdx
-inc rdi
-jmp for_copy_args20
-end_of_copy_args21:
+	cmp rdi, arg_count
+	je end_of_copy_args21
+	mov rax, 8
+	mul rdi
+	mov rdx, An(rdi)
+	mov qword [rcx+rax], rdx
+	inc rdi
+	 jmp for_copy_args20
+	end_of_copy_args21:
 mov qword [rbx], rcx
 mov r14, env
 cmp r14, 0
@@ -396,32 +426,32 @@ skip_code19:
 	PUSH qword [RAX]
 	call write_sob_if_not_void
 	ADD rsp, 1*8
-mov rbx, 0
-mov rax, 1
-cmp rax, 0
-je end_of_copy_envs5
-mov rdi, 16
-call malloc
-mov rbx, rax
-mov rax, arg_count
-mov rdi, 8
-mul rdi
-push rbx
-mov rdi, rax
-call malloc
-pop rbx
-mov rcx, rax
-mov rdi, 0
+	mov rbx, 0
+	mov rax, 1
+	cmp rax, 0
+	je end_of_copy_envs5
+	mov rdi, 16
+	call malloc
+	mov rbx, rax
+	mov rax, arg_count
+	mov rdi, 8
+	mul rdi
+	push rbx
+	mov rdi, rax
+	call malloc
+	pop rbx
+	mov rcx, rax
+	mov rdi, 0
 for_copy_args2:
-cmp rdi, arg_count
-je end_of_copy_args3
-mov rax, 8
-mul rdi
-mov rdx, An(rdi)
-mov qword [rcx+rax], rdx
-inc rdi
-jmp for_copy_args2
-end_of_copy_args3:
+	cmp rdi, arg_count
+	je end_of_copy_args3
+	mov rax, 8
+	mul rdi
+	mov rdx, An(rdi)
+	mov qword [rcx+rax], rdx
+	inc rdi
+	 jmp for_copy_args2
+	end_of_copy_args3:
 mov qword [rbx], rcx
 mov r14, env
 cmp r14, 0

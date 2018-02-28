@@ -967,45 +967,49 @@
 
 (define lexical_env 0)
 
-	(define cg-lambda-simple
-    (lambda (pe)
-        (set! lexical_env (+ lexical_env 1))
-            (let* ((args (cadr pe)) (body (caddr pe))
-            	  (skip_code_label (make-label "skip_code")) (for_copy_args (make-label "for_copy_args")) (end_of_copy_args (make-label "end_of_copy_args"))
-            	  (for_copy_envs (make-label "for_copy_envs")) (end_of_copy_envs (make-label "end_of_copy_envs")) (code_label (make-label "code")) (new_env (make-label "new_env"))
-                  (str-gen (string-append
-                  	
-                 
-                  	;create new env
-                  	"mov rbx, 0\n";env
-                    "mov rax, " (number->string lexical_env) "\n";major
-                    "cmp rax, 0\n"
-                    "je "end_of_copy_envs"\n"
-                    "mov rdi, "(number->string (* 8 (+ 1 lexical_env)))"\n";for allocating space for new extended env 
-                    "call malloc\n"
-                    "mov rbx, rax\n"	;rbx = malloc(8*(n+1)) *this is x*
+(define cg-lambda-simple
+  (lambda (pe)
+    (set! lexical_env (+ lexical_env 1))
+    (let* ((args (cadr pe))
+	   (body (caddr pe))
+	   (skip_code_label (make-label "skip_code"))
+	   (for_copy_args (make-label "for_copy_args"))
+	   (end_of_copy_args (make-label "end_of_copy_args"))
+	   (for_copy_envs (make-label "for_copy_envs"))
+	   (end_of_copy_envs (make-label "end_of_copy_envs"))
+	   (code_label (make-label "code"))
+	   (new_env (make-label "new_env"))
+	   (str-gen (string-append   
+		     ;;create new env
+		     tab "mov rbx, 0" newLine;env
+		     tab "mov rax, " (number->string lexical_env) newLine;major
+		     tab "cmp rax, 0" newLine
+		     tab "je " end_of_copy_envs newLine
+		     tab "mov rdi, "(number->string (* 8 (+ 1 lexical_env))) newLine;for allocating space for new extended env 
+		     tab "call malloc" newLine
+		     tab "mov rbx, rax"	newLine ;;rbx = malloc(8*(n+1)) *this is x*
                     
-                    "mov rax, arg_count\n"
-					"mov rdi, 8\n"
-					"mul rdi\n"
-                    "push rbx\n"	;save value of rbx 
-                    "mov rdi, rax\n"
-                    "call malloc\n"
-                    "pop rbx\n"
-                    "mov rcx, rax\n"	;rcx = malloc(8*m) *params of lambda*
-
-                    ;copy arguments into rcx
-					"mov rdi, 0\n"
-					for_copy_args":\n"
-					"cmp rdi, arg_count\n"
-					"je "end_of_copy_args"\n"
-					"mov rax, 8\n"
-					"mul rdi\n"
-					"mov rdx, An(rdi)\n"   ; rdx = i'th argument
-					"mov qword [rcx+rax], rdx\n" ; copy arg i into [rcx+8*i]
-					"inc rdi\n"
-					"jmp "for_copy_args"\n"
-					end_of_copy_args":\n"
+		     tab "mov rax, arg_count" newLine
+		     tab "mov rdi, 8" newLine
+		     tab "mul rdi" newLine
+		     tab "push rbx" newLine	;save value of rbx 
+		     tab "mov rdi, rax" newLine
+		     tab "call malloc" newLine
+		     tab "pop rbx" newLine
+		     tab "mov rcx, rax"	newLine
+		     ;;rcx = malloc(8*m) *params of lambda*
+		     ;;copy arguments into rcx
+		     tab "mov rdi, 0" newLine
+		     for_copy_args":" newLine
+		     tab "cmp rdi, arg_count" newLine
+		     tab "je " end_of_copy_args newLine
+		     tab "mov rax, 8" newLine
+		     tab "mul rdi" newLine
+		     tab "mov rdx, An(rdi)" newLine  ; rdx = i'th argument
+		     tab "mov qword [rcx+rax], rdx" newLine ;; copy arg i into [rcx+8*i]
+		     tab "inc rdi" newLine
+		     tab " jmp "for_copy_args newLine
+		     tab end_of_copy_args":" newLine
 
 					"mov qword [rbx], rcx\n"
 
@@ -1097,7 +1101,7 @@
   (lambda (ct ft)
     ;;(display (format "Generating Prolog\n"))
     (string-append "%include \"scheme.s\"" newLine
-		   ;; param-get-def
+		   param-get-def
 		   newLine
 		   "section .bss" newLine
 		   "global main" newLine
