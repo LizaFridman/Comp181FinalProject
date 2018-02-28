@@ -172,10 +172,13 @@ skip_code1:
 
 	MOV RAX, L_global0
 
+	PUSH rax
+	MOV RAX, qword [RAX]
 	MOV RAX, qword [RAX]
 	TYPE rax
 	CMP rax, T_CLOSURE
 	JE .not2_check_passed
+	POP rax
 	POP rbx
 	MOV rax, L_error_applic
 
@@ -185,6 +188,9 @@ skip_code1:
 	JMP L_exit
 
 .not2_check_passed:
+	POP rax
+	MOV rax, [rax]
+	MOV rax, [rax]
 	MOV rbx, rax
 	CLOSURE_ENV rbx
 	PUSH rbx
@@ -206,10 +212,13 @@ skip_code1:
 
 	MOV RAX, L_global0
 
+	PUSH rax
+	MOV RAX, qword [RAX]
 	MOV RAX, qword [RAX]
 	TYPE rax
 	CMP rax, T_CLOSURE
 	JE .not1_check_passed
+	POP rax
 	POP rbx
 	MOV rax, L_error_applic
 
@@ -219,6 +228,9 @@ skip_code1:
 	JMP L_exit
 
 .not1_check_passed:
+	POP rax
+	MOV rax, [rax]
+	MOV rax, [rax]
 	MOV rbx, rax
 	CLOSURE_ENV rbx
 	PUSH rbx

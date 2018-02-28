@@ -926,9 +926,11 @@
   (lambda (continue-label)
     (string-append
      tab "MOV RAX, qword [RAX]" newLine
+     tab "MOV RAX, qword [RAX]" newLine
      tab "TYPE rax" newLine
      tab "CMP rax, T_CLOSURE" newLine
      tab "JE " continue-label newLine
+     tab "POP rax" newLine
      tab "POP rbx" newLine
      tab "MOV rax, " error-applic-label newLine
      cg-print-rax
@@ -952,17 +954,21 @@
        newLine
        tab "XOR rbx, rbx" newLine
        tab "MOV rbx, " string-length newLine
-       tab "PUSH rbx" newLine
+       tab "PUSH rbx" newLine ;; num of args
        ;;tab "PUSH " (number->string args-length) newLine
        newLine
        (code-gen proc) ;;Rax = Closure value
        newLine
+       tab "PUSH rax" newLine
        (cg-check-T-closure pass-label)
        newLine
        pass-label ":" newLine
+       tab "POP rax" newLine
+       tab "MOV rax, [rax]" newLine
+       tab "MOV rax, [rax]" newLine
        tab "MOV rbx, rax" newLine
        tab "CLOSURE_ENV rbx" newLine
-       tab "PUSH rbx" newLine
+       tab "PUSH rbx" newLine ;; Env
        tab "CLOSURE_CODE rax" newLine
        tab "call rax" newLine
        
@@ -1190,7 +1196,6 @@
    tab "MOV rax, 60" newLine
    tab "MOV rdi, 0" newLine
    tab "syscall" newLine))
-   ;;tab "ret" newLine));;)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Built-in ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
