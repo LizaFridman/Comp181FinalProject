@@ -87,7 +87,8 @@
 (define compile-scheme-file
   (lambda (source dest)
     (let* ((exprs (file->list source))
-	   (pipelined (pipeline exprs))
+	   (built-in (file->list "Built-in.scm"))
+	   (pipelined (pipeline (append built-in exprs)))
 	   (size (length pipelined)))
       ;;(display (format "Pipelined = ~a\n" pipelined))
       ;;(display (format "Before c-table...\n"))
@@ -1155,7 +1156,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Built-in ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-
 (define built-in-map
   ;; <func-name, func-label>
   '((null? null-pred-label)
@@ -1168,7 +1168,37 @@
     (string? string-pred-label)
     (symbol? symbol-pred-label)
     (vector? vector-pred-label)
-    (procedure? closure-pred-label)))
+    (procedure? closure-pred-label)
+
+    (apply "L_apply")
+
+    (b< "L_less_b")
+    (b= "L_equal_b")
+    (b+ "L_add_b")
+    (b/ "L_div_b")
+    (b* "L_mult_b")
+    (b- "L_sub_b")
+
+    (car "L_car")
+    (cdr "L_cdr")
+    (char->integer "L_char_integer")
+    (cons "L_cons")
+    (denominator "L_denominator")
+    (eq? "L_eq")
+    (integer->char "L_integer_char")
+    (make-string "L_make_string")
+    (make-vector "L_make_vector")
+    (numerator "L_numerator")
+    (remainder "L_remainder")
+    (string-length "L_string_length")
+    (string-ref "L_string_ref")
+    (string-set! "L_string_set")
+    (string->symbol "L_string_symbol")
+    (symbol->string "L_symbol_string")
+    (vector "L_vector")
+    (vector-length "L_vector_length")
+    (vector-ref "L_vector_ref")
+    (vector-set! "L_vector_set")))
 
 (define built-in-funcs
   (map first built-in-map))
@@ -1312,10 +1342,16 @@
 (define create-built-in-closure
   (lambda (var index func-label)
     (string-append
-     (malloc 3)
-     ;;tab "" newLine
-     ;;tab "" newLine
-     )))
+     tab "MOV rdi, 16" newLine
+     tab "call malloc" newLine
+     tab "MOV rbx, rax" newLine
+     tab "PUSH rbx" newLine
+     newLine
+     tab "MOV rdi, 8" newLine
+     tab "call malloc" newLine
+     tab "POP rbx" newLine ;;rax=malloc(8), rbx=malloc(16)
+     tab "MOV rdx, " func-label newLine
+     tab "MAKE_LITERAL_CLOSURE rax, rbx, rdx" newLine)))
 
 (define self-implemented
   '((define not
@@ -1324,6 +1360,22 @@
 	    #f
 	    #t)))
 
+    ;;(define +
+     ;; (letrec ((loop
+                ;;(lambda (s)
+                 ;; (if (null? s)
+                   ;;   0
+                    ;;  (bin+ (car s)
+                     ;;       (loop (cdr s)))))))
+    ;;(lambda s (loop s))))
+    
+    (define +
+      (lambda args
+	(if (null? args)
+	    0
+	    (b+ (first args)
+		(+ (cdr args))))))
+    
     (define length
       (lambda (lst)
 	(if (null? lst)
