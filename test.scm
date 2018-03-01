@@ -1,5 +1,4 @@
 ;;; file 01
 
-#t
-#f
-'()
+(define x (cons 'a 'b))
+x

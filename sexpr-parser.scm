@@ -1,4 +1,4 @@
-(load "project/pc.scm")
+(load "pc.scm")
 
 (define <whitespace>
   (const (lambda (c)

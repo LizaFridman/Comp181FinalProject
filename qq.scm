@@ -3,7 +3,7 @@
 ;;;
 ;;; Programmer: Mayer Goldberg, 2016
 ;;;
-(load "project/pattern-matcher.scm")
+(load "pattern-matcher.scm")
 
 (define ^quote?
   (lambda (tag)

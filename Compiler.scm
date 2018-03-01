@@ -90,21 +90,21 @@
 	   (built-in (file->list "Built-in.scm"))
 	   (pipelined (pipeline (append built-in exprs)))
 	   (size (length pipelined)))
-      ;;(display (format "Pipelined = ~a\n" pipelined))
+      (display (format "Pipelined = ~a\n" pipelined))
       ;;(display (format "Before c-table...\n"))
       (set! c-table (master-build-c-table pipelined 6))
       ;;(display (format "C-Table:\n~a\n" c-table))
       ;;(display (format "Before F-Table...\n"))
       (set! f-table (master-build-f-table pipelined))
-      ;;(display (format "F-Table:\n~a\n" f-table))
+      (display (format "F-Table:\n~a\n" f-table))
       (let* ((pre (generate-pre-text c-table f-table))
 	     (code (create-code-to-run pipelined)))
 	;;(display (format "Pre-Text:\n~a\nCode:\n~b\n" pre code))
 	(list->file (string->list (string-append pre
 						 code
 						 post-text))
-		  dest)
-      (display (format "Compiled Scheme file with ~a parsed expressions!\n" size))))))
+		  dest)))))
+	;;(display (format "Compiled Scheme file with ~a parsed expressions!\n" size))))))
 
 ;--------------------------------------------------| cTable |--------------------------------------------------------
 
@@ -1016,6 +1016,7 @@
 					"_check_passed"))))
 	   ;;(display (format "Code-gen Applic:\nargs-length = ~a\nString-length = ~a\n" args-length  string-length))
       (string-append
+       ";; cg-applic" newLine
        (cg-push-args args)
        newLine
        tab "XOR rbx, rbx" newLine
@@ -1051,10 +1052,12 @@
     ;;(display (format "cg-define:\nVar = ~a\nValue = ~a\n" var value))
     (let ((address (number->string (f-table-get var))))
       ;;(display (format "Address for (~a ~a) is ~a\n" var value address))
-      (string-append (code-gen value)
-		     newLine
-		     tab "MOV qword [" fvar-label address "], RAX" newLine
-		     tab "MOV RAX, " sobVoid newLine))))
+      (string-append
+       ";; cg-define" newLine
+       (code-gen value)
+       newLine
+       tab "MOV qword [" fvar-label address "], RAX" newLine
+       tab "MOV RAX, " sobVoid newLine))))
 
 (define lexical_env -1)
 
@@ -1072,7 +1075,8 @@
 	   (end_of_copy_envs (make-label "end_of_copy_envs"))
 	   (code_label (make-label "code"))
 	   (new_env (make-label "new_env"))
-	   (str-gen (string-append   
+	   (str-gen (string-append
+		     ";; cg-lambda-simple" newLine
 		     ;;create new env
 		     tab "mov rbx, 0" newLine;env
 		     tab "mov rax, " (number->string lexical_env) newLine;major
@@ -1178,7 +1182,7 @@
 	   (loop_copy_envs (make-label "loop_copy_envs")) (loop_copy_envs_end (make-label "loop_copy_envs_end")) (code (make-label "code")) (new_env (make-label "new_env"))
 	   (loop_fix_stack (make-label "loop_fix_stack")) (loop_fix_stack_end (make-label "loop_fix_stack_end"))
 	   (str-gen (string-append
-					
+		     ";; cg-lambda-opt" newLine
 		     "mov rbx, 0\n"
 		     "mov rax, " (number->string lexical_env) "\n"
 		     "cmp rbx, 0\n"
@@ -1344,6 +1348,10 @@
 		   "main:" newLine
 		   ;;(master-symbol-builder ct)
 		   ;;"mov [SymbolTable], rax \n"
+		   newLine
+		   (cg-built-in-closures (filter (lambda (row)
+						   (built-in? (second row)))
+						 f-table))
 		   )))
 
 
@@ -1386,28 +1394,30 @@
 
 (define cg-cons
     (lambda()
-        (string-append
-            "mov rdi, 16\n"
-            "call malloc\n"
-            "mov rbx, qword 0\n"
-            "MAKE_LITERAL_CLOSURE rax, rbx, cons_body\n"
-            "mov [cons], rax\n"
-            "jmp cons_exit\n"
-            "L_cons:\n"
-            "push rbp\n"
-			"mov rbp, rsp\n"
-			"mov rbx, arg_count\n"
-	        "cmp rbx, 2\n" 
-	 		"jne cons_finish\n"
-            "mov rdi, 8\n"
-            "call malloc\n"
-            "mov rcx, An(0)\n"
-            "mov rdx, An(1)\n"
-            "MAKE_MALLOC_LITERAL_PAIR rax, rcx, rdx\n"
-            "cons_finish:\n"
-        	"leave\n"
-            "ret\n"
-            "cons_exit:\n")))
+      (string-append
+       ";; cg-cons" newLine
+       "mov rdi, 16\n"
+       "call malloc\n"
+       "mov rbx, qword 0\n"
+       "MAKE_LITERAL_CLOSURE rax, rbx, cons_body\n"
+       "mov [L_cons], rax\n"
+       "jmp cons_exit\n"
+       "cons_body:\n"
+       "push rbp\n"
+       "mov rbp, rsp\n"
+       "mov rbx, arg_count\n"
+       "cmp rbx, 2\n" 
+       "jne cons_finish\n"
+       "mov rdi, 8\n"
+       "call malloc\n"
+       "mov rcx, An(0)\n"
+       "mov rdx, An(1)\n"
+       "MAKE_MALLOC_LITERAL_PAIR rax, rcx, rdx\n"
+       "cons_finish:\n"
+       "leave\n"
+       "ret\n"
+       "cons_exit:\n")))
+
 (define cg-car
     (lambda()
         (string-append
@@ -1415,9 +1425,9 @@
             "call malloc\n"
             "mov rbx, qword 0\n"
             "MAKE_LITERAL_CLOSURE rax, rbx, car_body\n"
-            "mov [car], rax\n"
+            "mov [L_car], rax\n"
             "jmp car_exit\n"
-            "L_car:\n"
+            "car_body:\n"
             "push rbp\n"
 			"mov rbp, rsp\n"       
             "mov rax, An(0)\n"
@@ -1435,9 +1445,9 @@
             "call malloc\n"
             "mov rbx, qword 0\n"
             "MAKE_LITERAL_CLOSURE rax, rbx, cdr_body\n"
-            "mov [cdr], rax\n"
+            "mov [L_cdr], rax\n"
             "jmp cdr_exit\n"
-            "L_cdr:\n"
+            "cdr_body:\n"
             "push rbp\n"
 			"mov rbp, rsp\n"       
             "mov rax, An(0)\n"
@@ -1594,7 +1604,7 @@
   (map first built-in-map))
 
 (define built-in?
-  (lambda (fun)
+  (lambda (func)
     (member func built-in-funcs)))
 
 (define cg-built-in

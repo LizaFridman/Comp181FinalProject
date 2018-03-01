@@ -1,4 +1,4 @@
-(load "project/tag-parser.scm")
+(load "tag-parser.scm")
 
 (define lambda-simple-tag?
   (lambda (pe)
