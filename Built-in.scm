@@ -1,5 +1,5 @@
 (define not
-  (lambda (element extra)
+  (lambda (element)
     (if element
 	#f
 	#t)))
@@ -32,8 +32,8 @@
 	 ;;  lst2)
 	  ;;(else (cons (car lst1)
 		 ;;     (append (cdr lst1) lst2))))))
-;;(define list
- ;; (lambda args args))
+(define list
+  (lambda args args))
 
 ;;(define zero?
   ;;(lambda (element)

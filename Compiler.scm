@@ -90,13 +90,13 @@
 	   (built-in (file->list "Built-in.scm"))
 	   (pipelined (pipeline (append built-in exprs)))
 	   (size (length pipelined)))
-      ;;(display (format "Pipelined = ~a\n" pipelined))
+      (display (format "Pipelined = ~a\n" pipelined))
       ;;(display (format "Before c-table...\n"))
       (set! c-table (master-build-c-table pipelined 6))
       ;;(display (format "C-Table:\n~a\n" c-table))
       ;;(display (format "Before F-Table...\n"))
       (set! f-table (master-build-f-table pipelined))
-      ;;(display (format "F-Table:\n~a\n" f-table))
+      (display (format "F-Table:\n~a\n" f-table))
       (let* ((pre (generate-pre-text c-table f-table))
 	     (code (create-code-to-run pipelined)))
 	;;(display (format "Pre-Text:\n~a\nCode:\n~b\n" pre code))
@@ -654,15 +654,15 @@
 		(make-linked-symb-list-func (- symbol_count 1) ) ;symbol_count
 		)))
 
-(define master-symbol-builder
-	(lambda (table) ;c-table
-			(let* ((first (symb-table-make (get-symbols table)))
-				(second (make-linked-symb-list)))			
-			)))
+;(define master-symbol-builder
+;	(lambda (table) ;c-table
+;			(let* ((first (symb-table-make (get-symbols table)))
+;				(second (make-linked-symb-list)))			
+			;)))
 
-(define fetch-symbol
-	(lambda (x)
-		))
+;(define fetch-symbol
+;	(lambda (x)
+;		))
 
 
 
@@ -715,7 +715,7 @@
 	    (cg-lambda-simple pe))
 	   
 	   ((tag? 'lambda-opt pe)
-	    "")
+	    (cg-lambda-opt pe))
 	   
 	   ((tag? 'define pe)
 	    ;; (define (*var var) value)
@@ -1014,8 +1014,7 @@
 	   (string-length (number->string args-length))
 	   (pass-label (begin
 			 (set! applic-num (+ 1 applic-num))
-			 (string-append "."
-					(symbol->string (second proc))
+			 (string-append ".closure_"
 					(number->string applic-num)
 					"_check_passed"))))
 	   ;;(display (format "Code-gen Applic:\nargs-length = ~a\nString-length = ~a\n" args-length  string-length))
@@ -1174,157 +1173,117 @@
 
 
 
-
-
 (define cg-lambda-opt
-  (lambda (pe)
-    (set! lexical_env (+ lexical_env 1))
-    (let*   ((args (cadr pe))
-      		 (opt (caddr pe))
-	  	   	 (body (cadddr pe))
-	  	   	 (arg_leng (length args))
-	  	   	 (stack_fix_loop (make-label "stack_fix_loop"))
-	  	   	 (stack_fix_loop_end (make-label "stack_fix_loop_end"))
-	  	  	 (skip_code_label (make-label "skip_code"))
-	  		 (for_copy_args (make-label "for_copy_args"))
-	  		 (end_of_copy_args (make-label "end_of_copy_args"))
-	   		 (for_copy_envs (make-label "for_copy_envs"))
-	  		 (end_of_copy_envs (make-label "end_of_copy_envs"))
-	  		 (code_label (make-label "code"))
-			   (new_env (make-label "new_env"))
-			   (str-gen (string-append   
-		     ;;create new env
-		     tab "mov rbx, 0" newLine;env
-		     tab "mov rax, " (number->string lexical_env) newLine;major
-		     tab "cmp rax, 0" newLine
-		     tab "je " end_of_copy_envs newLine
-		     newLine
-		     tab "mov rdi, "(number->string (* 8 (+ 1 lexical_env))) newLine;for allocating space for new extended env 
-		     tab "call malloc" newLine
-		     tab "mov rbx, rax"	newLine ;;rbx = malloc(8*(n+1)) *this is x*
-		     newLine
-		     tab "mov rax, arg_count" newLine
-		     tab "mov rdi, 8" newLine
-		     tab "mul rdi" newLine
-		     tab "push rbx" newLine	;save value of rbx 
-		     tab "mov rdi, rax" newLine
-		     tab "call malloc" newLine
-		     tab "pop rbx" newLine
-		     tab "mov rcx, rax"	newLine
-		     ;;rcx = malloc(8*m) *params of lambda*
-		     ;;copy arguments into rcx
-		     newLine
-		     tab "mov rdi, 0" newLine
-		     for_copy_args":" newLine
-		     tab "cmp rdi, arg_count" newLine
-		     tab "je " end_of_copy_args newLine
-		     newLine
-		     tab "mov rax, 8" newLine
-		     tab "mul rdi" newLine
-		     tab "mov rdx, An(rdi)" newLine  ; rdx = i'th argument                      
-		     tab "mov qword [rcx+rax], rdx" newLine ;; copy arg i into [rcx+8*i]
-		     newLine
-		     tab "inc rdi" newLine
-		     tab " jmp "for_copy_args newLine
-		     newLine
-		     tab end_of_copy_args":" newLine
-		     tab "mov qword [rbx], rcx" newLine
-		     tab "mov r14, env"	newLine	;; rdx=previous env
-		     tab "cmp r14, 0" newLine
-		     tab "je "end_of_copy_envs"\n"
-		     tab "mov rdi, 0\n"
-		     newLine
-		     tab for_copy_envs":\n"
-		     tab "cmp rdi, " (number->string lexical_env) "\n"
-		     tab "je "end_of_copy_envs"\n"
-		     newLine
-		     tab "mov rax, 8\n"
-		     tab "mul rdi\n"
-		     tab "mov rcx, qword [r14+rax]\n" ; rcx = i'th env
-		     tab "mov qword [rbx+rax+8], rcx\n" ; copy env i into [rbx+8*i+8]
-		     tab "inc rdi\n"
-		     tab "jmp "for_copy_envs"\n"
-		     newLine
-		     tab end_of_copy_envs":\n"
-		     ;;create target
-		     tab "push rbx\n"
-		     tab "push rcx\n"
-		     tab "mov rdi, 16\n"
-		     tab "call malloc\n" ;rax = malloc(8*2)
-		     tab "pop rcx\n"
-		     tab "pop rbx\n"
-		     newLine
-		     tab "push rdx\n"
-		     tab "mov rdx, "code_label "\n"								
-
-
-
-
-
-
-
-
-              ; "MAKE_LITERAL_CLOSURE rax, rbx, "code_label "\n"
-		     tab "MAKE_LITERAL_CLOSURE rax, rbx, rdx \n"
-		     ";----------------fix stack here \n"
-		     "push rax \n"
-			 "push rbx \n"
-		     "push rcx \n"
-		     newLine		     
-		     "mov rax, arg_count\n"
-		     "mov rbx, An(rax)\n"
-		     "MAKE_MALLOC_LITERAL_PAIR rcx, " "rbx" sobFalse  "\n"
-
-		     newLine
-		     stack_fix_loop ": \n"
-		     "dec 1"
-		     "cmp rax, " arg_leng "\n"
-		     "je " stack_fix_loop_end "\n"
-		     "mov rbx, An(rax)\n"
-		     "MAKE_MALLOC_LITERAL_PAIR rcx, rbx, rcx \n"
-		     newLine
-		     "jmp " stack_fix_loop "\n"
-		     stack_fix_loop_end ":\n"
-		     newLine
-		     "mov rax, "arg_leng"\n"
-		     "mov rax, rcx\n"
-		     newline
-
-		     "mov arg_count, " arg_leng "\n"
-		     "push rax \n"
-			 "push rbx \n"
-		     "push rcx \n"
-		     ";----------------finished the stack fix\n"
-
-
-
-
-		     tab "pop rdx\n"
-
-		     tab "jmp "skip_code_label"\n"
-		     newLine
-		     ;;create code
-		     tab code_label":\n"
-		     tab "push rbp\n"
-		     tab "mov rbp, rsp\n"
-		     newLine
-		     tab (code-gen body)
-		     tab "mov rbx, rax\n"
-		     tab "mov rax, arg_count\n" ;--------------------------------------------------MAYBE REMOVE THIS
-		     tab "add rax, 1\n"
-		     tab "mov rdi, 8\n"
-		     tab "mul rdi\n"
-		     tab "add rsp, rax\n"
-		     tab "mov rax, rbx\n"
-		     newLine
-		     tab "leave\n"
-		     tab "ret\n"
-		     newLine
-		     tab skip_code_label":\n")))
-      (set! lexical_env (- lexical_env 1)) 
-      str-gen)))
-
-
+    (lambda (pe)
+      (set! lexical_env (+ lexical_env 1))
+      (let* ((args (cadr pe))
+	     (body (cadddr pe))
+	     (skip_code_label (skip_code_lbl))
+	     (for_copy_args (make-label "for_copy_args_lbl)) (end_of_copy_args (end_of_copy_args_lbl))
+	     (for_copy_envs (for_copy_envs_lbl)) (end_of_copy_envs (end_of_copy_envs_lbl)) (code_label (code_lbl)) (new_env (new_env_lbl))
+	     (for_fix_stack (for_fix_stack_lbl)) (end_of_fix_stack (end_of_fix_stack_lbl)) (dont_push_arg_label (dont_push_lbl))
+	     (str-gen (string-append
+					;create new env
+		       "mov rbx, 0\n";env
+		       "mov rax, " (number->string lexical_env) "\n";major
+		       "cmp rax, 0\n"
+		       "je "end_of_copy_envs"\n"
+		       "mov rdi, "(number->string (* 8 (+ 1 lexical_env)))"\n";for allocating space for new extended env 
+		       "call malloc\n"
+		       "mov rbx, rax\n"	;rbx = malloc(8*(n+1)) *this is x*
+		       
+		       "mov rax, arg_count\n"
+		       "mov rdi, 8\n"
+		       "mul rdi\n"
+		       "push rbx\n"	;save value of rbx 
+		       "mov rdi, rax\n"
+		       "call malloc\n"
+		       "pop rbx\n"
+		       "mov rcx, rax\n"	;rcx = malloc(8*m) *params of lambda*
+		       
+					;copy arguments into rcx
+		       "mov rdi, 0\n"
+		       for_copy_args":\n"
+		       "cmp rdi, arg_count\n"
+		       "je "end_of_copy_args"\n"
+		       "mov rax, 8\n"
+		       "mul rdi\n"
+		       "mov rdx, An(rdi)\n"   ; rdx = i'th argument
+		       "mov qword [rcx+rax], rdx\n" ; copy arg i into [rcx+8*i]
+		       "inc rdi\n"
+		       "jmp "for_copy_args"\n"
+		       end_of_copy_args":\n"
+		       
+		       "mov qword [rbx], rcx\n"
+		       
+		       "mov r14, env\n"		; r14=previous env
+		       "cmp r14, 0\n"
+		       "jle "end_of_copy_envs"\n"
+		       "mov rdi, 0\n"
+		       for_copy_envs":\n"
+		       "cmp rdi, " (number->string lexical_env) "\n"
+		       "je "end_of_copy_envs"\n"
+		       "mov rax, 8\n"
+		       "mul rdi\n"
+		       "mov rcx, qword [r14+rax]\n" ; rcx = i'th env
+		       "mov qword [rbx+rax+8], rcx\n" ; copy env i into [rbx+8*i+8]
+		       "inc rdi\n"
+		       "jmp "for_copy_envs"\n"
+		       
+		       end_of_copy_envs":\n"
+					;create target
+		       "push rbx\n"
+		       "push rcx\n"
+		       "mov rdi, 16\n"
+		       "call malloc\n" ;rax = malloc(8*2)
+		       "pop rcx\n"
+		       "pop rbx\n"
+		       
+		       "MAKE_LITERAL_CLOSURE rax, rbx, " code_label "\n"
+		       
+		       "jmp "skip_code_label"\n"
+		       
+		       code_label":\n"
+		       "push rbp\n"
+		       "mov rbp, rsp\n"
+		       "mov rbx, const_2\n"
+		       "mov r10, arg_count\n"
+		       
+		       for_fix_stack":\n"
+		       "cmp r10, "(number->string (length args)) "\n"
+		       "je " end_of_fix_stack "\n"
+		       
+		       "mov rdi, 8\n"
+		       "call malloc\n"			
+		       "mov rdx, rbp\n"				
+		       "add rdx, 4*8\n"				;rdx point to n+m in stack (offset)
+		       "mov r11, r10\n"				;r10 is helper for point of arg[i]
+		       "dec r11\n"
+		       "shl r11, 3\n"				;now offset+r10 = address of curr arg				
+		       "add rdx, r11\n"				;rdx = address of arg[i]
+		       "mov rdx, qword [rdx]\n"		
+		       
+		       "MAKE_MALLOC_LITERAL_PAIR rax, rdx, rbx\n"	;rax = target, rbx = cdr, rcx = car
+		       "mov rbx, rax\n"				;rbx ponints to the new pair as cdr for the new allocate in next iteration
+		       "dec r10\n"					
+		       "jmp " for_fix_stack "\n"
+					
+		       end_of_fix_stack":\n"
+		       "cmp rbx, const_2\n"
+					;"je "dont_push_arg_label"\n"
+		       "mov qword [rbp+4*8+"(number->string (length args))"*8], rbx\n"	;add the list in stack after const params (not optinals)
+					;dont_push_arg_label":\n"
+					;"mov qword [rbp+5*8+"(number->string (length args))"*8], const_2\n"
+					;"mov qword [rbp + 3*8], "(number->string (+ 1 (length args)))"\n" ;update arg_count
+					;"add rsp, r9\n"
+		       
+		       (code-gen body)
+		       
+		       "leave\n"
+		       "ret\n"
+		       skip_code_label":\n")))
+        (set! lexical_env (- lexical_env 1)) 
+	str-gen)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1393,8 +1352,8 @@
 		   "section .text" newLine
 		   newLine
 		   "main:" newLine
-		   (master-symbol-builder ct)
-		   "mov [SymbolTable], rax \n"
+		   ;;(master-symbol-builder ct)
+		   ;;"mov [SymbolTable], rax \n"
 		   )))
 
 
