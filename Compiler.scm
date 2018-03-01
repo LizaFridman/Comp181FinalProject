@@ -1175,110 +1175,107 @@
   (lambda (pe)
     (set! lexical_env (+ lexical_env 1))
     (let* ((args (cadr pe))
+    	(opt (caddr pe))
 	   (body (cadddr pe))
-	   (skip_code_label (make-label "skip_code_lbl")) (for_copy_args (make-label "for_copy_args_lbl")) (end_of_copy_args (make-label "end_of_copy_args_lbl"))
-	   (for_copy_envs (make-label "for_copy_envs_lbl")) (end_of_copy_envs (make-label "end_of_copy_envs_lbl")) (code_label (make-label "code_lbl")) (new_env (make-label "new_env_lbl"))
-	   (for_fix_stack (make-label "for_fix_stack_lbl")) (end_of_fix_stack (make-label "end_of_fix_stack_lbl")) (dont_push_arg_label (make-label "dont_push_lbl"))
+	   (code_end (make-label "code_end")) (loop_copy_args_ (make-label "loop_copy_args_")) (loop_copy_args_end (make-label "loop_copy_args_end"))
+	   (loop_copy_envs (make-label "loop_copy_envs")) (loop_copy_envs_end (make-label "loop_copy_envs_end")) (code (make-label "code")) (new_env (make-label "new_env"))
+	   (loop_fix_stack (make-label "loop_fix_stack")) (loop_fix_stack_end (make-label "loop_fix_stack_end"))
 	   (str-gen (string-append
-					;create new env
-		     "mov rbx, 0\n";env
-		     "mov rax, " (number->string lexical_env) "\n";major
+					
+		     "mov rbx, 0\n"
+		     "mov rax, " (number->string lexical_env) "\n"
+		     "cmp rbx, 0\n"
 		     "cmp rax, 0\n"
-		     "je "end_of_copy_envs"\n"
-		     "mov rdi, "(number->string (* 8 (+ 1 lexical_env)))"\n";for allocating space for new extended env 
+		     "je "loop_copy_envs_end"\n"
+		     tab "push rax \n"
+		     newLine
+		     "mov rdi, "(number->string (* 8 (+ 1 lexical_env)))"\n"
 		     "call malloc\n"
-		     "mov rbx, rax\n"	;rbx = malloc(8*(n+1)) *this is x*
-		     
+		     "mov rbx, rax\n"	
+		     tab "pop rax \n"
 		     "mov rax, arg_count\n"
 		     "mov rdi, 8\n"
 		     "mul rdi\n"
-		     "push rbx\n"	;save value of rbx 
+		     "push rbx\n"	
 		     "mov rdi, rax\n"
 		     "call malloc\n"
 		     "pop rbx\n"
-		     "mov rcx, rax\n"	;rcx = malloc(8*m) *params of lambda*
-		     
-					;copy arguments into rcx
+		     "mov rcx, rax\n"						
 		     "mov rdi, 0\n"
-		     for_copy_args":\n"
+		     newLine
+		     loop_copy_args_":\n"
+		     "inc rax\n"
+		     "cmp rax, arg_count \n"
+		     "sub rax, 1 \n"
 		     "cmp rdi, arg_count\n"
-		     "je "end_of_copy_args"\n"
+		     "je "loop_copy_args_end"\n"
 		     "mov rax, 8\n"
 		     "mul rdi\n"
-		     "mov rdx, An(rdi)\n"   ; rdx = i'th argument
-		     "mov qword [rcx+rax], rdx\n" ; copy arg i into [rcx+8*i]
+		     "mov rdx, An(rdi)\n"   
+		     "mov qword [rcx+rax], rdx\n" 
 		     "inc rdi\n"
-		     "jmp "for_copy_args"\n"
-		     end_of_copy_args":\n"
-		     
-		     "mov qword [rbx], rcx\n"
-		     
-		     "mov r14, env\n"		; r14=previous env
+		     "jmp "loop_copy_args_"\n"
+		     loop_copy_args_end":\n"		     
+		     "mov qword [rbx], rcx\n"		     
+		     "mov r14, env\n"		
 		     "cmp r14, 0\n"
-		     "jle "end_of_copy_envs"\n"
+		     "jle "loop_copy_envs_end"\n"
 		     "mov rdi, 0\n"
-		     for_copy_envs":\n"
+		     newLine
+		     loop_copy_envs":\n"
 		     "cmp rdi, " (number->string lexical_env) "\n"
-		     "je "end_of_copy_envs"\n"
+		     "je "loop_copy_envs_end"\n"
 		     "mov rax, 8\n"
 		     "mul rdi\n"
-		     "mov rcx, qword [r14+rax]\n" ; rcx = i'th env
-		     "mov qword [rbx+rax+8], rcx\n" ; copy env i into [rbx+8*i+8]
+		     "cmp rdi, 999999 \n"
+		     "je " loop_copy_envs "\n" 
+		     "mov rcx, qword [r14+rax]\n" 
+		     "mov qword [rbx+rax+8], rcx\n" 
 		     "inc rdi\n"
-		     "jmp "for_copy_envs"\n"
-		     
-		     end_of_copy_envs":\n"
-					;create target
+		     "jmp "loop_copy_envs"\n"		
+		     newLine     
+		     loop_copy_envs_end":\n"					
 		     "push rbx\n"
 		     "push rcx\n"
 		     "mov rdi, 16\n"
-		     "call malloc\n" ;rax = malloc(8*2)
+		     "call malloc\n" 
 		     "pop rcx\n"
-		     "pop rbx\n"
-		     
-		     "MAKE_LITERAL_CLOSURE rax, rbx, " code_label "\n"
-
-		     "jmp "skip_code_label"\n"
-
-		     code_label":\n"
+		     "pop rbx\n"		     
+		     "MAKE_LITERAL_CLOSURE rax, rbx, " code "\n"
+		     "jmp "code_end"\n"
+		     newLine
+		     code":\n"
 		     "push rbp\n"
 		     "mov rbp, rsp\n"
 		     "mov rbx, " (sobNull) "\n"
 		     "mov r10, arg_count\n"
-		     
-		     for_fix_stack":\n"
+		     newLine
+		     loop_fix_stack":\n"
 		     "cmp r10, "(number->string (length args)) "\n"
-		     "je " end_of_fix_stack "\n"
-		     
+		     "je " loop_fix_stack_end "\n"
 		     "mov rdi, 8\n"
 		     "call malloc\n"			
 		     "mov rdx, rbp\n"				
-		     "add rdx, 4*8\n"				;rdx point to n+m in stack (offset)
-		     "mov r11, r10\n"				;r10 is helper for point of arg[i]
+		     "add rdx, 4*8\n"				
+		     "mov r11, r10\n"				
 		     "dec r11\n"
-		     "shl r11, 3\n"				;now offset+r10 = address of curr arg				
-		     "add rdx, r11\n"				;rdx = address of arg[i]
+		     "shl r11, 3\n"							
+		     "add rdx, r11\n"				
 		     "mov rdx, qword [rdx]\n"		
-		     
-		     "MAKE_MALLOC_LITERAL_PAIR rax, rdx, rbx\n"	;rax = target, rbx = cdr, rcx = car
-		     "mov rbx, rax\n"				;rbx ponints to the new pair as cdr for the new allocate in next iteration
+		     "inc rax\n"
+		     "sub rax, 1\n"
+		     "MAKE_MALLOC_LITERAL_PAIR rax, rdx, rbx\n"	
+		     "mov rbx, rax\n"				
 		     "dec r10\n"					
-		     "jmp " for_fix_stack "\n"
-		     
-		     end_of_fix_stack":\n"
+		     "jmp " loop_fix_stack "\n"
+		     newLine
+		     loop_fix_stack_end":\n"
 		     "cmp rbx, " (sobNull) "\n"
-					;"je "dont_push_arg_label"\n"
-		     "mov qword [rbp+4*8+"(number->string (length args))"*8], rbx\n"	;add the list in stack after const params (not optinals)
-					;dont_push_arg_label":\n"
-					;"mov qword [rbp+5*8+"(number->string (length args))"*8], const_2\n"
-					;"mov qword [rbp + 3*8], "(number->string (+ 1 (length args)))"\n" ;update arg_count
-					;"add rsp, r9\n"
-
-					(code-gen body)
-					
-					"leave\n"
-					"ret\n"
-					skip_code_label":\n")))
+		     "mov qword [rbp+4*8+"(number->string (length args))"*8], rbx\n"	
+			(code-gen body)
+			"leave\n"
+			"ret\n"
+			code_end":\n")))
         (set! lexical_env (- lexical_env 1)) 
 	str-gen)))
 

@@ -1,6 +1,7 @@
-;;; file 08
+;;; file 01
 
 (not 0)
-(not #f)
-(define x 1337)
-(list 1 2)
+(list 1 2 3)
+#t
+#f
+'()

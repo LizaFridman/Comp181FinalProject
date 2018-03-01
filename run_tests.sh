@@ -1,3 +1,4 @@
+ #!/bin/bash
 total_tests=0
 tests_passed=0
 tests_failed=0

@@ -52,9 +52,9 @@ gcc -m64 -Wall -o test03 test03.o
 3/4
 4/5
 6/7
-(1 . (2 . (3 . ())))
-(1 . (2 . (3 . ())))
-((1 . (2 . ())) . ((3 . (4 . ())) . ()))
+(1 2 3)
+(1 2 3)
+((1 2) (3 4))
 1234
 #\a
 *** our output: 
@@ -82,7 +82,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test05.s -o test05.o
 gcc -m64 -Wall -o test05 test05.o
 [1;31m *** RESULTS DIFFER in test05 ☹[0m
-*** scheme output: ((#t . ()) . ((#t . ()) . ((#t . ()) . ())))
+*** scheme output: ((#t) (#t) (#t))
 *** our output: 
 --------------------------------
 
@@ -92,7 +92,7 @@ echo '(load "Compiler.scm") (compile-scheme-file "test06.scm" "test06.s")' | sch
 nasm -f elf64 test06.s -o test06.o
 Makefile:6: recipe for target 'test06' failed
 [1;31m *** RESULTS DIFFER in test06 ☹[0m
-*** scheme output: (a . (b . (c . (d . (e . (f . (g . (h . (i . (j . ()))))))))))
+*** scheme output: (a b c d e f g h i j)
 *** our output: 
 --------------------------------
 
@@ -204,15 +204,15 @@ Compiled Scheme file with 23 parsed expressions!
 nasm -f elf64 test13.s -o test13.o
 gcc -m64 -Wall -o test13 test13.o
 [1;31m *** RESULTS DIFFER in test13 ☹[0m
-*** scheme output: (1 . (2 . (3 . ())))
-(1 . (2 . (3 . (4 . ()))))
-((1 . (2 . ())) . ((3 . (4 . ())) . ((5 . (6 . (7 . ()))) . ())))
+*** scheme output: (1 2 3)
+(1 2 3 4)
+((1 2) (3 4) (5 6 7))
 1
-(2 . (3 . (4 . ())))
-(1 . (3 . (5 . ())))
-#3(1 2 3)
-#4(1 2 3 4)
-#5(5 5 5 5 5)
+(2 3 4)
+(1 3 5)
+#(1 2 3)
+#(1 2 3 4)
+#(5 5 5 5 5)
 3
 4
 5
@@ -314,9 +314,9 @@ Makefile:6: recipe for target 'tests' failed
 #t
 3
 bla
-(1 . (2 . (3 . ())))
+(1 2 3)
 4
-(5 . (6 . (78 . (9 . ()))))
+(5 6 78 9)
 5
 181
 #t
@@ -367,7 +367,7 @@ bla
 #t
 #t
 #t
-(720 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . ()))))))))
+(720 fact-1 fact-2 fact-3 fact-1 fact-2 fact-3 fact-1)
 *** our output: 
 --------------------------------
 
@@ -1109,7 +1109,7 @@ echo '(load "Compiler.scm") (compile-scheme-file "a6.scm" "a6.s")' | scheme -q
 nasm -f elf64 a6.s -o a6.o
 Makefile:6: recipe for target 'a6' failed
 [1;31m *** RESULTS DIFFER in a6 ☹[0m
-*** scheme output: (1 . (2 . (4 . 5)))
+*** scheme output: (1 2 4 . 5)
 *** our output: 
 --------------------------------
 
@@ -1119,7 +1119,7 @@ echo '(load "Compiler.scm") (compile-scheme-file "a7.scm" "a7.s")' | scheme -q
 nasm -f elf64 a7.s -o a7.o
 Makefile:6: recipe for target 'a7' failed
 [1;31m *** RESULTS DIFFER in a7 ☹[0m
-*** scheme output: #4(1 2 3 4)
+*** scheme output: #(1 2 3 4)
 *** our output: 
 --------------------------------
 
@@ -1191,7 +1191,7 @@ echo '(load "Compiler.scm") (compile-scheme-file "a14.scm" "a14.s")' | scheme -q
 nasm -f elf64 a14.s -o a14.o
 Makefile:6: recipe for target 'a14' failed
 [1;31m *** RESULTS DIFFER in a14 ☹[0m
-*** scheme output: (7 . (8 . (9 . ())))
+*** scheme output: (7 8 9)
 *** our output: 
 --------------------------------
 
@@ -1273,7 +1273,7 @@ echo '(load "Compiler.scm") (compile-scheme-file "a23.scm" "a23.s")' | scheme -q
 nasm -f elf64 a23.s -o a23.o
 Makefile:6: recipe for target 'a23' failed
 [1;31m *** RESULTS DIFFER in a23 ☹[0m
-*** scheme output: (b . (2 . ("bob" . (3 . ()))))
+*** scheme output: (b 2 "bob" 3)
 *** our output: 
 --------------------------------
 
@@ -1304,7 +1304,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test05.s -o test05.o
 gcc -m64 -Wall -o test05 test05.o
 [1;31m *** RESULTS DIFFER in test05 ☹[0m
-*** scheme output: ((#t . ()) . ((#t . ()) . ((#t . ()) . ())))
+*** scheme output: ((#t) (#t) (#t))
 *** our output: 
 --------------------------------
 
@@ -1314,7 +1314,7 @@ echo '(load "Compiler.scm") (compile-scheme-file "test06.scm" "test06.s")' | sch
 nasm -f elf64 test06.s -o test06.o
 Makefile:6: recipe for target 'test06' failed
 [1;31m *** RESULTS DIFFER in test06 ☹[0m
-*** scheme output: (a . (b . (c . (d . (e . (f . (g . (h . (i . (j . ()))))))))))
+*** scheme output: (a b c d e f g h i j)
 *** our output: 
 --------------------------------
 
@@ -1446,7 +1446,8 @@ echo '(load "Compiler.scm") (compile-scheme-file "torture-test-for-compiler-09.s
 nasm -f elf64 torture-test-for-compiler-09.s -o torture-test-for-compiler-09.o
 Makefile:6: recipe for target 'torture-test-for-compiler-09' failed
 [1;31m *** RESULTS DIFFER in torture-test-for-compiler-09 ☹[0m
-*** scheme output: (3628800 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . ()))))))))))))
+*** scheme output: (3628800 fact-1 fact-2 fact-3 fact-1 fact-2 fact-3 fact-1
+  fact-2 fact-3 fact-1 fact-2)
 *** our output: 
 --------------------------------
 
@@ -1912,7 +1913,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 mayer_test08.s -o mayer_test08.o
 gcc -m64 -Wall -o mayer_test08 mayer_test08.o
 [1;31m *** RESULTS DIFFER in mayer_test08 ☹[0m
-*** scheme output: ((#t . ()) . ((#t . ()) . ((#t . ()) . ())))
+*** scheme output: ((#t) (#t) (#t))
 *** our output: 
 --------------------------------
 
@@ -1922,7 +1923,8 @@ echo '(load "Compiler.scm") (compile-scheme-file "mayer_test09.scm" "mayer_test0
 nasm -f elf64 mayer_test09.s -o mayer_test09.o
 Makefile:6: recipe for target 'mayer_test09' failed
 [1;31m *** RESULTS DIFFER in mayer_test09 ☹[0m
-*** scheme output: (3628800 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . (fact-3 . (fact-1 . (fact-2 . ()))))))))))))
+*** scheme output: (3628800 fact-1 fact-2 fact-3 fact-1 fact-2 fact-3 fact-1
+  fact-2 fact-3 fact-1 fact-2)
 *** our output: 
 --------------------------------
 
@@ -1994,7 +1996,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test0.s -o test0.o
 gcc -m64 -Wall -o test0 test0.o
 [1;31m *** RESULTS DIFFER in test0 ☹[0m
-*** scheme output: #2((quote . ((4 . (5 . ())) . ())) (1 . (2 . ())))
+*** scheme output: #('(4 5) (1 2))
 *** our output: 
 --------------------------------
 
@@ -2005,7 +2007,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test1.s -o test1.o
 gcc -m64 -Wall -o test1 test1.o
 [1;31m *** RESULTS DIFFER in test1 ☹[0m
-*** scheme output: #6("B" 3 (quote . (cake . ())) cookie donut pie)
+*** scheme output: #("B" 3 'cake cookie donut pie)
 *** our output: 
 --------------------------------
 
@@ -2016,7 +2018,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test2.s -o test2.o
 gcc -m64 -Wall -o test2 test2.o
 [1;31m *** RESULTS DIFFER in test2 ☹[0m
-*** scheme output: (1 . (2 . (3 . (4 . (4 . (5 . (6 . (7 . (8 . (9 . (10 . (11 . (12 . (13 . ((14 . (15 . ((16 . ()) . ()))) . (17 . (18 . (19 . (20 . ())))))))))))))))))))
+*** scheme output: (1 2 3 4 4 5 6 7 8 9 10 11 12 13 (14 15 (16)) 17 18 19 20)
 *** our output: 
 --------------------------------
 
@@ -2027,7 +2029,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test3.s -o test3.o
 gcc -m64 -Wall -o test3 test3.o
 [1;31m *** RESULTS DIFFER in test3 ☹[0m
-*** scheme output: ((quote . ((quote . ((quote . (a . ())) . ())) . ())) . ())
+*** scheme output: ('''a)
 *** our output: 
 --------------------------------
 
@@ -2038,7 +2040,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test4.s -o test4.o
 gcc -m64 -Wall -o test4 test4.o
 [1;31m *** RESULTS DIFFER in test4 ☹[0m
-*** scheme output: (quote . ((quote . ((quote . ((quote . (b . ())) . ())) . ())) . ()))
+*** scheme output: ''''b
 *** our output: 
 --------------------------------
 
@@ -2049,7 +2051,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test5.s -o test5.o
 gcc -m64 -Wall -o test5 test5.o
 [1;31m *** RESULTS DIFFER in test5 ☹[0m
-*** scheme output: ("A" . ())
+*** scheme output: ("A")
 *** our output: 
 --------------------------------
 
@@ -2113,7 +2115,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test11.s -o test11.o
 gcc -m64 -Wall -o test11 test11.o
 [1;31m *** RESULTS DIFFER in test11 ☹[0m
-*** scheme output: (1 . (2 . ((quote . (k . ())) . ())))
+*** scheme output: (1 2 'k)
 *** our output: 
 --------------------------------
 
@@ -2124,7 +2126,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test12.s -o test12.o
 gcc -m64 -Wall -o test12 test12.o
 [1;31m *** RESULTS DIFFER in test12 ☹[0m
-*** scheme output: (1 . (2 . ((quote . (k . ())) . ())))
+*** scheme output: (1 2 'k)
 *** our output: 
 --------------------------------
 
@@ -2259,7 +2261,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test32.s -o test32.o
 gcc -m64 -Wall -o test32 test32.o
 [1;31m *** RESULTS DIFFER in test32 ☹[0m
-*** scheme output: (2 . (3 . (4 . (6 . (7 . (8 . (9 . (10 . ()))))))))
+*** scheme output: (2 3 4 6 7 8 9 10)
 *** our output: 
 --------------------------------
 
@@ -2329,7 +2331,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test39.s -o test39.o
 gcc -m64 -Wall -o test39 test39.o
 [1;31m *** RESULTS DIFFER in test39 ☹[0m
-*** scheme output: ((1 . (2 . ())) . ((3 . (4 . ())) . ((5 . (6 . ())) . ((7 . (8 . ())) . (((9 . (10 . ())) . ((quote . ((11 . (12 . ())) . ())) . ())) . ())))))
+*** scheme output: ((1 2) (3 4) (5 6) (7 8) ((9 10) '(11 12)))
 *** our output: 
 --------------------------------
 
@@ -2340,7 +2342,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test40.s -o test40.o
 gcc -m64 -Wall -o test40 test40.o
 [1;31m *** RESULTS DIFFER in test40 ☹[0m
-*** scheme output: (5 . (9 . ()))
+*** scheme output: (5 9)
 *** our output: 
 --------------------------------
 
@@ -2351,7 +2353,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test100.s -o test100.o
 gcc -m64 -Wall -o test100 test100.o
 [1;31m *** RESULTS DIFFER in test100 ☹[0m
-*** scheme output: (1 . (2 . (3 . (4 . (5 . (6 . ()))))))
+*** scheme output: (1 2 3 4 5 6)
 *** our output: 
 --------------------------------
 
@@ -2362,7 +2364,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test101.s -o test101.o
 gcc -m64 -Wall -o test101 test101.o
 [1;31m *** RESULTS DIFFER in test101 ☹[0m
-*** scheme output: (1 . (2 . (3 . (4 . (5 . (6 . ()))))))
+*** scheme output: (1 2 3 4 5 6)
 *** our output: 
 --------------------------------
 
@@ -2384,7 +2386,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test103.s -o test103.o
 gcc -m64 -Wall -o test103 test103.o
 [1;31m *** RESULTS DIFFER in test103 ☹[0m
-*** scheme output: (1 . (2 . (3 . (1 . (2 . 3)))))
+*** scheme output: (1 2 3 1 2 . 3)
 *** our output: 
 --------------------------------
 
@@ -2395,7 +2397,7 @@ Compiled Scheme file with 8 parsed expressions!
 nasm -f elf64 test104.s -o test104.o
 gcc -m64 -Wall -o test104 test104.o
 [1;31m *** RESULTS DIFFER in test104 ☹[0m
-*** scheme output: (1 . (2 . ($ . (4 . ()))))
+*** scheme output: (1 2 $ 4)
 *** our output: 
 --------------------------------
 
@@ -2428,7 +2430,7 @@ Compiled Scheme file with 3 parsed expressions!
 nasm -f elf64 test109.s -o test109.o
 gcc -m64 -Wall -o test109 test109.o
 [1;31m *** RESULTS DIFFER in test109 ☹[0m
-*** scheme output: (2 . ())
+*** scheme output: (2)
 *** our output: 
 --------------------------------
 
@@ -2586,5 +2588,863 @@ gcc -m64 -Wall -o test127 test127.o
 Doing test AllTests/ChloucheTests/tests/test128.scm:
 --------------------------------
 echo '(load "Compiler.scm") (compile-scheme-file "test128.scm" "test128.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test128.s -o test128.o
+gcc -m64 -Wall -o test128 test128.o
+[1;31m *** RESULTS DIFFER in test128 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test129.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test129.scm" "test129.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test129.s -o test129.o
+gcc -m64 -Wall -o test129 test129.o
+[1;31m *** RESULTS DIFFER in test129 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test130.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test130.scm" "test130.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test130.s -o test130.o
+gcc -m64 -Wall -o test130 test130.o
+[1;31m *** RESULTS DIFFER in test130 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test131.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test131.scm" "test131.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test131.s -o test131.o
+gcc -m64 -Wall -o test131 test131.o
+[1;31m *** RESULTS DIFFER in test131 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test132.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test132.scm" "test132.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test132.s -o test132.o
+gcc -m64 -Wall -o test132 test132.o
+[1;31m *** RESULTS DIFFER in test132 ☹[0m
+*** scheme output: 0
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test133.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test133.scm" "test133.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test133.s -o test133.o
+gcc -m64 -Wall -o test133 test133.o
+[1;31m *** RESULTS DIFFER in test133 ☹[0m
+*** scheme output: 0
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test134.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test134.scm" "test134.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test134.s -o test134.o
+gcc -m64 -Wall -o test134 test134.o
+[1;31m *** RESULTS DIFFER in test134 ☹[0m
+*** scheme output: 5/2
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test135.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test135.scm" "test135.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test135.s -o test135.o
+gcc -m64 -Wall -o test135 test135.o
+[1;31m *** RESULTS DIFFER in test135 ☹[0m
+*** scheme output: 5/6
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test136.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test136.scm" "test136.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test136.s -o test136.o
+gcc -m64 -Wall -o test136 test136.o
+[1;31m *** RESULTS DIFFER in test136 ☹[0m
+*** scheme output: 1/3
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test137.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test137.scm" "test137.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test137.s -o test137.o
+gcc -m64 -Wall -o test137 test137.o
+[1;31m *** RESULTS DIFFER in test137 ☹[0m
+*** scheme output: 1
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test138.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test138.scm" "test138.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test138.s -o test138.o
+gcc -m64 -Wall -o test138 test138.o
+[1;31m *** RESULTS DIFFER in test138 ☹[0m
+*** scheme output: 77/60
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test139.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test139.scm" "test139.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test139.s -o test139.o
+gcc -m64 -Wall -o test139 test139.o
+[1;31m *** RESULTS DIFFER in test139 ☹[0m
+*** scheme output: 13/60
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test140.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test140.scm" "test140.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test140.s -o test140.o
+gcc -m64 -Wall -o test140 test140.o
+[1;31m *** RESULTS DIFFER in test140 ☹[0m
+*** scheme output: 1/3
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test141.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test141.scm" "test141.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test141.s -o test141.o
+gcc -m64 -Wall -o test141 test141.o
+[1;31m *** RESULTS DIFFER in test141 ☹[0m
+*** scheme output: 2
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test142.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test142.scm" "test142.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test142.s -o test142.o
+gcc -m64 -Wall -o test142 test142.o
+[1;31m *** RESULTS DIFFER in test142 ☹[0m
+*** scheme output: -3
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test143.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test143.scm" "test143.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test143.s -o test143.o
+gcc -m64 -Wall -o test143 test143.o
+[1;31m *** RESULTS DIFFER in test143 ☹[0m
+*** scheme output: 1
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test144.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test144.scm" "test144.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test144.s -o test144.o
+gcc -m64 -Wall -o test144 test144.o
+[1;31m *** RESULTS DIFFER in test144 ☹[0m
+*** scheme output: 1/7
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test145.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test145.scm" "test145.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test145.s -o test145.o
+gcc -m64 -Wall -o test145 test145.o
+[1;31m *** RESULTS DIFFER in test145 ☹[0m
+*** scheme output: -1/12
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test146.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test146.scm" "test146.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test146.s -o test146.o
+gcc -m64 -Wall -o test146 test146.o
+[1;31m *** RESULTS DIFFER in test146 ☹[0m
+*** scheme output: 1
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test147.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test147.scm" "test147.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test147.s -o test147.o
+gcc -m64 -Wall -o test147 test147.o
+[1;31m *** RESULTS DIFFER in test147 ☹[0m
+*** scheme output: 2
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test148.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test148.scm" "test148.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test148.s -o test148.o
+gcc -m64 -Wall -o test148 test148.o
+[1;31m *** RESULTS DIFFER in test148 ☹[0m
+*** scheme output: 10/7
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test149.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test149.scm" "test149.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test149.s -o test149.o
+gcc -m64 -Wall -o test149 test149.o
+[1;31m *** RESULTS DIFFER in test149 ☹[0m
+*** scheme output: 9
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test150.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test150.scm" "test150.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test150.s -o test150.o
+gcc -m64 -Wall -o test150 test150.o
+[1;31m *** RESULTS DIFFER in test150 ☹[0m
+*** scheme output: -3/323
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test151.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test151.scm" "test151.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test151.s -o test151.o
+gcc -m64 -Wall -o test151 test151.o
+[1;31m *** RESULTS DIFFER in test151 ☹[0m
+*** scheme output: -3
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test152.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test152.scm" "test152.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test152.s -o test152.o
+gcc -m64 -Wall -o test152 test152.o
+[1;31m *** RESULTS DIFFER in test152 ☹[0m
+*** scheme output: -4/7
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test153.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test153.scm" "test153.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test153.s -o test153.o
+gcc -m64 -Wall -o test153 test153.o
+[1;31m *** RESULTS DIFFER in test153 ☹[0m
+*** scheme output: 2
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test154.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test154.scm" "test154.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test154.s -o test154.o
+gcc -m64 -Wall -o test154 test154.o
+[1;31m *** RESULTS DIFFER in test154 ☹[0m
+*** scheme output: 7/2
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test155.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test155.scm" "test155.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test155.s -o test155.o
+gcc -m64 -Wall -o test155 test155.o
+[1;31m *** RESULTS DIFFER in test155 ☹[0m
+*** scheme output: -1/6
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test156.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test156.scm" "test156.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test156.s -o test156.o
+gcc -m64 -Wall -o test156 test156.o
+[1;31m *** RESULTS DIFFER in test156 ☹[0m
+*** scheme output: 0
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test157.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test157.scm" "test157.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test157.s -o test157.o
+gcc -m64 -Wall -o test157 test157.o
+[1;31m *** RESULTS DIFFER in test157 ☹[0m
+*** scheme output: -1/2
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test158.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test158.scm" "test158.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test158.s -o test158.o
+gcc -m64 -Wall -o test158 test158.o
+[1;31m *** RESULTS DIFFER in test158 ☹[0m
+*** scheme output: -17/60
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test159.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test159.scm" "test159.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test159.s -o test159.o
+gcc -m64 -Wall -o test159 test159.o
+[1;31m *** RESULTS DIFFER in test159 ☹[0m
+*** scheme output: 47/60
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test160.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test160.scm" "test160.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test160.s -o test160.o
+gcc -m64 -Wall -o test160 test160.o
+[1;31m *** RESULTS DIFFER in test160 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test161.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test161.scm" "test161.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test161.s -o test161.o
+gcc -m64 -Wall -o test161 test161.o
+[1;31m *** RESULTS DIFFER in test161 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test162.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test162.scm" "test162.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test162.s -o test162.o
+gcc -m64 -Wall -o test162 test162.o
+[1;31m *** RESULTS DIFFER in test162 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test163.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test163.scm" "test163.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test163.s -o test163.o
+gcc -m64 -Wall -o test163 test163.o
+[1;31m *** RESULTS DIFFER in test163 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test164.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test164.scm" "test164.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test164.s -o test164.o
+gcc -m64 -Wall -o test164 test164.o
+[1;31m *** RESULTS DIFFER in test164 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test165.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test165.scm" "test165.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test165.s -o test165.o
+gcc -m64 -Wall -o test165 test165.o
+[1;31m *** RESULTS DIFFER in test165 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test166.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test166.scm" "test166.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test166.s -o test166.o
+gcc -m64 -Wall -o test166 test166.o
+[1;31m *** RESULTS DIFFER in test166 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test167.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test167.scm" "test167.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test167.s -o test167.o
+gcc -m64 -Wall -o test167 test167.o
+[1;31m *** RESULTS DIFFER in test167 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test168.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test168.scm" "test168.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test168.s -o test168.o
+gcc -m64 -Wall -o test168 test168.o
+[1;31m *** RESULTS DIFFER in test168 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test169.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test169.scm" "test169.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test169.s -o test169.o
+gcc -m64 -Wall -o test169 test169.o
+[1;31m *** RESULTS DIFFER in test169 ☹[0m
+*** scheme output: 1
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test170.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test170.scm" "test170.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test170.s -o test170.o
+gcc -m64 -Wall -o test170 test170.o
+[1;31m *** RESULTS DIFFER in test170 ☹[0m
+*** scheme output: (2 3)
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test171.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test171.scm" "test171.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test171.s -o test171.o
+gcc -m64 -Wall -o test171 test171.o
+[1;31m *** RESULTS DIFFER in test171 ☹[0m
+*** scheme output: 65
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test172.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test172.scm" "test172.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test172.s -o test172.o
+gcc -m64 -Wall -o test172 test172.o
+[1;31m *** RESULTS DIFFER in test172 ☹[0m
+*** scheme output: 12
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test173.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test173.scm" "test173.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test173.s -o test173.o
+gcc -m64 -Wall -o test173 test173.o
+[1;31m *** RESULTS DIFFER in test173 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test174.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test174.scm" "test174.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test174.s -o test174.o
+gcc -m64 -Wall -o test174 test174.o
+[1;31m *** RESULTS DIFFER in test174 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test175.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test175.scm" "test175.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test175.s -o test175.o
+gcc -m64 -Wall -o test175 test175.o
+[1;31m *** RESULTS DIFFER in test175 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test178.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test178.scm" "test178.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test178.s -o test178.o
+gcc -m64 -Wall -o test178 test178.o
+[1;31m *** RESULTS DIFFER in test178 ☹[0m
+*** scheme output: (1 -2 3 #t)
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test179.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test179.scm" "test179.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test179.s -o test179.o
+gcc -m64 -Wall -o test179 test179.o
+[1;31m *** RESULTS DIFFER in test179 ☹[0m
+*** scheme output: 1
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test180.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test180.scm" "test180.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test180.s -o test180.o
+gcc -m64 -Wall -o test180 test180.o
+[1;31m *** RESULTS DIFFER in test180 ☹[0m
+*** scheme output: 7
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test181.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test181.scm" "test181.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test181.s -o test181.o
+gcc -m64 -Wall -o test181 test181.o
+[1;31m *** RESULTS DIFFER in test181 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test182.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test182.scm" "test182.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test182.s -o test182.o
+gcc -m64 -Wall -o test182 test182.o
+[1;31m *** RESULTS DIFFER in test182 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test183.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test183.scm" "test183.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test183.s -o test183.o
+gcc -m64 -Wall -o test183 test183.o
+[1;31m *** RESULTS DIFFER in test183 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test184.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test184.scm" "test184.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test184.s -o test184.o
+gcc -m64 -Wall -o test184 test184.o
+[1;31m *** RESULTS DIFFER in test184 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test185.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test185.scm" "test185.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test185.s -o test185.o
+gcc -m64 -Wall -o test185 test185.o
+[1;31m *** RESULTS DIFFER in test185 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test186.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test186.scm" "test186.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test186.s -o test186.o
+gcc -m64 -Wall -o test186 test186.o
+[1;31m *** RESULTS DIFFER in test186 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test187.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test187.scm" "test187.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test187.s -o test187.o
+gcc -m64 -Wall -o test187 test187.o
+[1;31m *** RESULTS DIFFER in test187 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test188.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test188.scm" "test188.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test188.s -o test188.o
+gcc -m64 -Wall -o test188 test188.o
+[1;31m *** RESULTS DIFFER in test188 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test190.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test190.scm" "test190.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test190.s -o test190.o
+gcc -m64 -Wall -o test190 test190.o
+[1;31m *** RESULTS DIFFER in test190 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test192.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test192.scm" "test192.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test192.s -o test192.o
+gcc -m64 -Wall -o test192 test192.o
+[1;31m *** RESULTS DIFFER in test192 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test193.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test193.scm" "test193.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test193.s -o test193.o
+gcc -m64 -Wall -o test193 test193.o
+[1;31m *** RESULTS DIFFER in test193 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test195.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test195.scm" "test195.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test195.s -o test195.o
+gcc -m64 -Wall -o test195 test195.o
+[1;31m *** RESULTS DIFFER in test195 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test197.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test197.scm" "test197.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test197.s -o test197.o
+gcc -m64 -Wall -o test197 test197.o
+[1;31m *** RESULTS DIFFER in test197 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test198.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test198.scm" "test198.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test198.s -o test198.o
+gcc -m64 -Wall -o test198 test198.o
+[1;31m *** RESULTS DIFFER in test198 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test199.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test199.scm" "test199.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test199.s -o test199.o
+gcc -m64 -Wall -o test199 test199.o
+[1;31m *** RESULTS DIFFER in test199 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test200.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test200.scm" "test200.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test200.s -o test200.o
+gcc -m64 -Wall -o test200 test200.o
+[1;31m *** RESULTS DIFFER in test200 ☹[0m
+*** scheme output: #f
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test201.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test201.scm" "test201.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test201.s -o test201.o
+gcc -m64 -Wall -o test201 test201.o
+[1;31m *** RESULTS DIFFER in test201 ☹[0m
+*** scheme output: #\newline
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test204.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test204.scm" "test204.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test204.s -o test204.o
+gcc -m64 -Wall -o test204 test204.o
+[1;31m *** RESULTS DIFFER in test204 ☹[0m
+*** scheme output: (-1 2 -3 4)
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test205.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test205.scm" "test205.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test205.s -o test205.o
+gcc -m64 -Wall -o test205 test205.o
+[1;31m *** RESULTS DIFFER in test205 ☹[0m
+*** scheme output: (#t #t #f #t)
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test206.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test206.scm" "test206.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test206.s -o test206.o
+gcc -m64 -Wall -o test206 test206.o
+[1;31m *** RESULTS DIFFER in test206 ☹[0m
+*** scheme output: ()
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test207.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test207.scm" "test207.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test207.s -o test207.o
+gcc -m64 -Wall -o test207 test207.o
+[1;31m *** RESULTS DIFFER in test207 ☹[0m
+*** scheme output: "\x0;\x0;\x0;"
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test208.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test208.scm" "test208.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test208.s -o test208.o
+gcc -m64 -Wall -o test208 test208.o
+[1;31m *** RESULTS DIFFER in test208 ☹[0m
+*** scheme output: "rrrrr"
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test209.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test209.scm" "test209.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test209.s -o test209.o
+gcc -m64 -Wall -o test209 test209.o
+[1;31m *** RESULTS DIFFER in test209 ☹[0m
+*** scheme output: #(0 0 0 0 0 0 0)
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test210.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test210.scm" "test210.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test210.s -o test210.o
+gcc -m64 -Wall -o test210 test210.o
+[1;31m *** RESULTS DIFFER in test210 ☹[0m
+*** scheme output: #("scheme" "scheme")
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test211.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test211.scm" "test211.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test211.s -o test211.o
+Makefile:6: recipe for target 'test211' failed
+[1;31m *** RESULTS DIFFER in test211 ☹[0m
+*** scheme output: ("batman" "batman" "batman")
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test212.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test212.scm" "test212.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test212.s -o test212.o
+gcc -m64 -Wall -o test212 test212.o
+[1;31m *** RESULTS DIFFER in test212 ☹[0m
+*** scheme output: (-1 -2 -3/5)
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test215.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test215.scm" "test215.s")' | scheme -q
+Compiled Scheme file with 3 parsed expressions!
+nasm -f elf64 test215.s -o test215.o
+gcc -m64 -Wall -o test215 test215.o
+[1;31m *** RESULTS DIFFER in test215 ☹[0m
+*** scheme output: #t
+*** our output: 
+--------------------------------
+
+Doing test AllTests/ChloucheTests/tests/test216.scm:
+--------------------------------
+echo '(load "Compiler.scm") (compile-scheme-file "test216.scm" "test216.s")' | scheme -q
 break> 
-Makefile:6: recipe for target 'test128' failed
+Makefile:6: recipe for target 'test216' failed
