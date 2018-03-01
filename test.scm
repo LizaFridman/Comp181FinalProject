@@ -1,3 +1,3 @@
 ;;; file 01
 
-(char->integer #\a)
+(vector 1 4 5)

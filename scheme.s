@@ -272,6 +272,36 @@
 	or rax, T_VECTOR
 %endmacro
 
+%macro MULT 2
+	mov rax, %1
+	mul %2
+	mov %1, rax
+%endmacro
+
+;; MAKE_LITERAL_FRACTION_WITH_REGS target-address, num-address, den-address
+%macro MAKE_LITERAL_FRACTION_WITH_REGS 3
+	push rax 
+	push rbx 
+	mov rax, %1 
+	mov qword [rax], %2
+	sub qword [rax], start_of_data
+	shl qword [rax], ((WORD_SIZE - TYPE_BITS) >> 1) 
+	mov rbx, %3 
+	sub rbx, start_of_data
+	or qword [rax], rbx 
+	shl qword [rax], TYPE_BITS 
+	or qword [rax], T_FRACTION 
+	pop rbx 
+	pop rax 
+%endmacro
+
+%macro IABS 1
+	cmp %1, 0
+	jge %%cont
+	neg %1
+	%%cont:
+%endmacro
+
 %define SOB_UNDEFINED MAKE_LITERAL(T_UNDEFINED, 0)
 %define SOB_VOID MAKE_LITERAL(T_VOID, 0)
 %define SOB_FALSE MAKE_LITERAL(T_BOOL, 0)
@@ -356,6 +386,56 @@ section .data
 ;	add rsp, 1*8
 	
 ;	ret
+
+gcd:
+	push rbp
+	mov rbp, rsp
+  	mov r11, r8
+  	mov r12, r9
+
+	mov rdx, qword 0
+	;mov rax, [rbp + 4 + 1*4] ; first
+	;mov rbx, [rbp + 4 + 2*4] ; second
+	IABS r11
+	IABS r12
+	cmp r11, r12
+	jge .gcd_loop
+	xchg r11, r12
+	
+.gcd_loop:
+	mov rax, r11
+	cmp r12, 0
+	je .gcd_done
+	mov rdx, qword 0
+	div r12
+	mov r11, r12
+	mov r12, rdx
+	jmp .gcd_loop
+
+.gcd_done:
+	leave
+	ret
+
+simplify_fraction:
+  push rbp
+  mov rbp, rsp
+
+  call gcd 
+  mov r10, rax ;r10=gcd(r8,r9)
+  mov rax, r8
+  mov rdx, qword 0
+  CQO
+  idiv r10
+  mov r8, rax
+  mov rax, r9
+  mov rdx, qword 0
+  CQO
+  idiv r10
+  mov r9, rax
+  push r9
+  push r8 
+  leave
+  ret
 
 write_sob_undefined:
 	push rbp

@@ -13,13 +13,6 @@
 ;;       (loop (cdr s)))))))
 ;;(lambda s (loop s))))
 
-;;(define +
- ;; (lambda args
-  ;;  (if (null? args)
-;;	0
-;;	(b+ (first args)
-;;	    (+ (cdr args))))))
-
 ;;(define length
  ;; (lambda (lst)
   ;;  (if (null? lst)
@@ -34,6 +27,19 @@
 		 ;;     (append (cdr lst1) lst2))))))
 (define list
   (lambda args args))
+
+(define fold_left
+  (lambda (proc init lst)
+    (if (null? lst) 
+	init 
+	(fold_left proc (proc init (car lst)) (cdr lst)))))
+
+(define +
+  (lambda x
+    (fold_left (lambda (acc y)
+		 (b+ acc y))
+	       0
+	       x)))
 
 ;;(define zero?
   ;;(lambda (element)
