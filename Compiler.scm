@@ -592,7 +592,7 @@
 
 (define master-build-f-table
   (lambda (exp)
-    (let ((extracted (extract-fvars exp)))
+    (let ((extracted (append built-in-funcs (extract-fvars exp))))
       ;;(display (format "Extracted f-vars: ~a\n" extracted))
 	(master-give-indxes (build-f-table '() extracted)))))
 
@@ -1568,7 +1568,7 @@
     (string? string-pred-label)
     (symbol? symbol-pred-label)
     (vector? vector-pred-label)
-    (procedure? closure-pred-label)
+    (procedure? "L_closure_check")
 
     (apply "L_apply")
 
