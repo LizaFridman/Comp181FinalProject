@@ -2164,6 +2164,1034 @@
 	        "ret\n"
 	        "vector_set_exit:\n" )))
 
+(define cg-bin-minus
+	(lambda ()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_minus_body\n"
+            "mov [L_global17], rax\n"
+            "jmp bin_minus_exit\n"
+            
+            "bin_minus_body:\n"
+        	"push rbp\n"
+      		"mov rbp, rsp\n"
+      		"mov rcx ,arg_count\n"
+      		"mov rax ,An(0)\n"                
+
+      		"cmp rcx, 2\n"         			; nil + 1 arguments?
+      		"jne bin_minus_finish\n"
+     
+      		"mov rax ,qword [rax]\n"                     
+      		"mov rcx, rax\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_minus_arg1_int_check_arg2\n"
+      
+      		"bin_minus_arg1_frac_check_arg2:\n"
+      		"mov rbx, An(1)\n"
+       		"mov rbx, qword [rbx]\n"                    
+      		"mov rcx, rbx\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_minus_arg1_frac_arg2_int\n"
+   
+      		"bin_minus_arg1_frac_arg2_frac:\n"
+      		"mov rcx, rax\n"				
+      		"CAR rcx\n"
+      		"DATA rcx\n"					;rcx holds arg1 numerator	
+      		"mov r11, rax\n"      			;rdx keeps rax value
+      		"CDR r11\n"
+      		"DATA r11\n"
+      
+     		"mov r10, rbx\n"					
+      		"CAR r10\n"
+      		"DATA r10\n"					;r10 holds arg2 numerator
+      		"mov r12, rbx\n"				;r12 keeps r10 value
+      		"CDR r12\n"
+      		"DATA r12\n"
+      		"mov r8, r11\n"					;backup first denominator
+
+      		"MULT r11, r12\n"				;now r11 holds arg1 denominator * arg2 denominator
+      		"MULT rcx, r12\n"				;now rcx holds arg1 numerator * arg2 denominator
+      		"MULT r10, r8\n"				;now r10 holds second numerator * arg1 denominator
+      		"sub rcx, r10\n"
+      		"mov rax, rcx\n"	
+      		"mov r12, r11\n"					
+      		"jmp bin_minus_simplify_and_create_fraction\n"                                             
+      		
+		  	"bin_minus_arg1_int_check_arg2:\n"
+		  	"mov rbx, An(1)\n"
+		  	"mov rbx, qword [rbx]\n"                    
+		  	"mov rdx, rbx\n"
+		  	"TYPE rdx\n"
+		  	"cmp rdx, T_INTEGER\n"
+		  	"je bin_minus_arg1_int_arg2_int\n"
+
+		  	"bin_minus_arg1_int_arg2_frac:\n"
+		  	"mov r10, rbx\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n";we will put in r10 second_numerator
+		  	"mov r12, rbx\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n";we will put in r12 second_denominator
+		  	"mov r8,rax\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r12\n"
+		  	"mov rax,r8\n";now rax holds first_numerator*second_denominator
+		  	"sub rax,r10\n"
+		  	"jmp bin_minus_simplify_and_create_fraction\n"
+
+		  	"bin_minus_arg1_frac_arg2_int:\n"
+		  	"mov r10, rax\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n"
+		  	"mov r12, rax\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n"
+		  	"mov r8,rbx\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r12\n"
+		  	"mov rax,r8\n";now rax holds first_numerator*second_denominator
+		  	"sub r10, rax\n"
+		  	"mov rax, r10\n"
+
+		  	;rax holds new numerator
+		  	;r12 holds new denominator
+		  	"bin_minus_simplify_and_create_fraction:\n"
+		  	"mov r8,  rax\n"
+		  	"mov r9, r12\n"
+		  	"push r9\n"
+		  	"push r8\n"
+		  	"call simplify_fraction\n"
+		  	"add rsp, 16\n"
+		  	"jmp bin_minus_create_new_fraction\n"
+
+		  	"bin_minus_arg1_int_arg2_int:\n"
+		  	"DATA rbx\n" 
+		  	"DATA rax\n"      
+		  	"sub rax, rbx\n"
+		  	"mov r10, rax\n"
+		  	"shl r10, 4\n"
+		  	"or r10, T_INTEGER\n"
+		  	"push r10\n"
+		  	"mov rdi, 8\n"
+		  	"call malloc\n"
+		  	"pop r10\n"
+		  	"mov [rax],r10\n"
+		                        
+		  	"jmp bin_minus_finish\n"                     
+                    
+		  	"bin_minus_create_new_fraction:\n"
+		  	"cmp r9, 1\n"
+		  	"je bin_minus_create_new_int\n"
+
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
+		  	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		    
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "mov rbx, rax\n"
+		    "mov [rbx], r8\n"
+		    "push rbx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop rbx\n"
+		    "mov rcx, rax\n"
+		    "mov [rcx], r9\n"
+		    "push rbx\n"
+		    "push rcx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n" 
+		    "pop rcx\n"
+		    "pop rbx\n"
+                                              
+		  	"MAKE_LITERAL_FRACTION_WITH_REGS rax, rbx, rcx\n"      
+		  	"jmp bin_minus_finish\n"
+		          
+		   	"bin_minus_create_new_int:\n"
+
+		   	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"
+		  	"push r8\n"
+
+		  	"mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop r8\n"
+		    "mov [rax], r8\n"
+          
+	        "bin_minus_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_minus_exit:\n")))
+
+
+(define cg-less-than
+ 	(lambda()       
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_less_than_body\n"
+            "mov [L_global12], rax\n"
+            "jmp bin_less_than_exit\n"
+            
+            "bin_less_than_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne bin_less_than_finish\n"
+
+	 		;"push const_2\n"
+	 		"push An(1)\n"
+	 		"push An(0)\n"
+	 		"push 2\n"
+	 		"push qword 0\n"
+	 		"call bin_minus_body\n"
+	 		"mov rax, [rax]\n"
+	 		"mov rbx, rax\n"
+	 		"TYPE rbx\n"
+	 		"cmp rbx, T_INTEGER\n"
+	 		"je check_sign\n"
+	 		"CAR rax\n"
+
+	 		"check_sign:\n"
+	 		"DATA rax\n"
+	 		"cmp rax, 0\n"
+	 		"jl bin_less_than_true\n"
+	        
+	        "mov rax, const_4\n"
+	        "jmp bin_less_than_finish\n"
+
+	        "bin_less_than_true:\n"
+	        "mov rax, const_3\n"
+
+	        "bin_less_than_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_less_than_exit:\n" )))
+
+
+
+(define cg-eq?
+ 	(lambda()       
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, eq?_body\n"
+            "mov [L_global13], rax\n"
+            "jmp eq?_exit\n"
+            
+            "eq?_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne eq?_finish\n"
+
+	 		"mov rax, An(0)\n"
+	 		"mov rax, [rax]\n"
+	 		"mov rbx, An(1)\n"
+	 		"mov rbx, [rbx]\n"
+	        "cmp rax, rbx\n"
+	        "je eq?_true\n"
+	        "mov rax, const_4\n"
+	        "jmp eq?_finish\n"
+	        
+	        "eq?_true:\n"
+	        "mov rax, const_3\n"
+
+	        "eq?_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "eq?_exit:\n" )))
+
+
+(define cg-bin-plus
+	(lambda ()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_plus_body\n"
+            "mov [L_global14], rax\n"
+            "jmp bin_plus_exit\n"
+            
+            "bin_plus_body:\n"
+        	"push rbp\n"
+      		"mov rbp, rsp\n"
+      		"mov rcx ,arg_count\n"
+      		"mov rax ,An(0)\n"                
+
+      		"cmp rcx, 2\n"         			; nil + 1 arguments?
+      		"jne bin_plus_finish\n"
+     
+      		"mov rax ,qword [rax]\n"                     
+      		"mov rcx, rax\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_plus_arg1_int_check_arg2\n"
+      
+      		"bin_plus_arg1_frac_check_arg2:\n"
+      		"mov rbx, An(1)\n"
+       		"mov rbx, qword [rbx]\n"                    
+      		"mov rcx, rbx\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"jne bin_plus_arg1_frac_arg2_frac\n"
+      		"mov r10, rax\n"
+      		"mov rax, rbx\n"
+      		"mov rbx, r10\n"
+      		"jmp bin_plus_arg1_int_arg2_frac\n"
+      
+      		"bin_plus_arg1_frac_arg2_frac:\n"
+      		"mov rcx, rax\n"				
+      		"CAR rcx\n"
+      		"DATA rcx\n"					;rcx holds arg1 numerator	
+      		"mov r11, rax\n"      			;rdx keeps rax value
+      		"CDR r11\n"
+      		"DATA r11\n"
+      
+     		"mov r10, rbx\n"					
+      		"CAR r10\n"
+      		"DATA r10\n"					;r10 holds arg2 numerator
+      		"mov r12, rbx\n"				;r12 keeps r10 value
+      		"CDR r12\n"
+      		"DATA r12\n"
+      		"mov r8, r11\n"					;backup first denominator
+
+      		"MULT r11, r12\n"				;now r11 holds arg1 denominator * arg2 denominator
+      		"MULT rcx, r12\n"				;now rcx holds arg1 numerator * arg2 denominator
+      		"MULT r10, r8\n"				;now r10 holds second numerator * arg1 denominator
+      		"add rcx, r10\n"
+      		"mov rax, rcx\n"	
+      		"mov r12, r11\n"					
+      		"jmp bin_plus_simplify_and_create_fraction\n"                                             
+      		
+		  	"bin_plus_arg1_int_check_arg2:\n"
+		  	"mov rbx, An(1)\n"
+		  	"mov rbx, qword [rbx]\n"                    
+		  	"mov rdx, rbx\n"
+		  	"TYPE rdx\n"
+		  	"cmp rdx, T_INTEGER\n"
+		  	"je bin_plus_arg1_int_arg2_int\n"
+
+		  	"bin_plus_arg1_int_arg2_frac:\n"
+		  	"mov r10, rbx\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n";we will put in r10 second_numerator
+		  	"mov r12, rbx\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n";we will put in r12 second_denominator
+		  	"mov r8,rax\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r12\n"
+		  	"mov rax,r8\n";now rax holds first_numerator*second_denominator
+		  	"add rax,r10\n"
+
+		  	;rax holds new numerator
+		  	;r12 holds new denominator
+		  	"bin_plus_simplify_and_create_fraction:\n"
+		  	"mov r8,  rax\n"
+		  	"mov r9, r12\n"
+		  	"push r9\n"
+		  	"push r8\n"
+		  	"call simplify_fraction\n"
+		  	"add rsp, 16\n"
+		  	"jmp bin_plus_create_new_fraction\n"
+
+		  	"bin_plus_arg1_int_arg2_int:\n"
+		  	"DATA rbx\n" 
+		  	"DATA rax\n"      
+		  	"add rbx,rax\n"
+		  	"shl rbx, 4\n"
+		  	"or rbx, T_INTEGER\n"
+		  	"push rbx\n"
+		  	"mov rdi, 8\n"
+		  	"call malloc\n"
+		  	"pop rbx\n"
+		  	"mov [rax],rbx\n"
+		                        
+		  	"jmp bin_plus_finish\n"                     
+                    
+		  	"bin_plus_create_new_fraction:\n"
+		  	"cmp r9, 1\n"
+		  	"je bin_plus_create_new_int\n"
+
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
+		  	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		    
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "mov rbx, rax\n"
+		    "mov [rbx], r8\n"
+		    "push rbx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop rbx\n"
+		    "mov rcx, rax\n"
+		    "mov [rcx], r9\n"
+		    "push rbx\n"
+		    "push rcx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n" 
+		    "pop rcx\n"
+		    "pop rbx\n"
+                                               
+		  	"MAKE_LITERAL_FRACTION_WITH_REGS rax, rbx, rcx\n"
+		  	"jmp bin_plus_finish\n"
+		          
+		   	"bin_plus_create_new_int:\n"
+
+		   	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"
+		  	"push r8\n"
+
+		  	"mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop r8\n"
+		    "mov [rax], r8\n"
+          
+	        "bin_plus_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_plus_exit:\n")))
+
+
+(define cg-bin-div
+	(lambda ()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_div_body\n"
+            "mov [L_global15], rax\n"
+            "jmp bin_div_exit\n"
+            
+            "bin_div_body:\n"
+        	"push rbp\n"
+      		"mov rbp, rsp\n"
+      		"mov rcx ,arg_count\n"
+      		"mov rax ,An(0)\n"                
+
+      		"cmp rcx, 2\n"         			; nil + 1 arguments?
+      		"jne bin_div_finish\n"
+     
+      		"mov rax ,qword [rax]\n"                     
+      		"mov rcx, rax\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_div_arg1_int_check_arg2\n"
+      
+      		"bin_div_arg1_frac_check_arg2:\n"
+      		"mov rbx, An(1)\n"
+       		"mov rbx, qword [rbx]\n"                    
+      		"mov rcx, rbx\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_div_arg1_frac_arg2_int\n"
+      
+      		"bin_div_arg1_frac_arg2_frac:\n"
+      		"mov rcx, rax\n"				
+      		"CAR rcx\n"
+      		"DATA rcx\n"					;rcx holds arg1 numerator	
+      		"mov r11, rax\n"      			;rdx keeps rax value
+      		"CDR r11\n"
+      		"DATA r11\n"
+      
+     		"mov r10, rbx\n"					
+      		"CAR r10\n"
+      		"DATA r10\n"					;r10 holds arg2 numerator
+      		"mov r12, rbx\n"				;r12 keeps r10 value
+      		"CDR r12\n"
+      		"DATA r12\n"
+      		"mov r8, r11\n"					;backup first denominator
+
+      		"MULT rcx, r12\n"				;now rcx holds arg1 numerator * arg2 denominator
+      		"MULT r11, r10\n"				;now r11 holds arg1 denominator * arg2 numerator
+      		"cmp r11, 0\n"
+		  	"jg bin_div_positive_int1\n"
+		  	"neg r11\n"
+		  	"neg rcx\n"
+		  	"bin_div_positive_int1:\n"
+      		"mov rax, rcx\n"	
+      		"mov r12, r11\n"					
+      		"jmp bin_div_simplify_and_create_fraction\n"                                             
+      		
+		  	"bin_div_arg1_int_check_arg2:\n"
+		  	"mov rbx, An(1)\n"
+		  	"mov rbx, qword [rbx]\n"                    
+		  	"mov rdx, rbx\n"
+		  	"TYPE rdx\n"
+		  	"cmp rdx, T_INTEGER\n"
+		  	"je bin_div_arg1_int_arg2_int\n"
+
+		  	"bin_div_arg1_int_arg2_frac:\n"
+		  	"mov r10, rbx\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n";we will put in r10 second_numerator
+		  	"mov r12, rbx\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n";we will put in r12 second_denominator
+		  	"mov r8,rax\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r12\n"
+		  	"cmp r10, 0\n"
+		  	"jg bin_div_positive_int2\n"
+		  	"neg r10\n"
+		  	"neg r8\n"
+		  	"bin_div_positive_int2:\n"
+		  	"mov r12, r10\n"
+		  	"mov rax,r8\n"
+		  	"jmp bin_div_simplify_and_create_fraction\n"
+
+		  	"bin_div_arg1_frac_arg2_int:\n"
+		  	"mov r10, rax\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n"
+		  	"mov r12, rax\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n"
+		  	"mov r8,rbx\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r12\n"
+		  	"cmp r8, 0\n"
+		  	"jg bin_div_positive_int3\n"
+		  	"neg r8\n"
+		  	"neg r10\n"
+		  	"bin_div_positive_int3:\n"
+		  	"mov rax,r8\n";now rax holds first_denominator*second_denominator
+		  	"mov r11, rax\n"
+		  	"mov rax, r10\n"
+		  	"mov r12, r11\n"
+
+
+		  	;rax holds new numerator
+		  	;r12 holds new denominator
+		  	"bin_div_simplify_and_create_fraction:\n"
+		  	"mov r8,  rax\n"
+		  	"mov r9, r12\n"
+		  	"push r9\n"
+		  	"push r8\n"
+		  	"call simplify_fraction\n"
+		  	"add rsp, 16\n"
+		  	"jmp bin_div_create_new_fraction\n"
+
+		  	"bin_div_arg1_int_arg2_int:\n"
+		  	"DATA rax\n"
+		  	"DATA rbx\n"
+		  	"mov r12, rbx\n"
+		  	"cmp r12, 0\n"
+		  	"jg bin_div_positive_int4\n"
+		  	"neg r12\n"
+		  	"neg rax\n"
+		  	"bin_div_positive_int4:\n" 
+		  	"jmp bin_div_simplify_and_create_fraction\n"
+		                                
+		  	"bin_div_create_new_fraction:\n"
+		  	"cmp r9, 1\n"
+		  	"je bin_div_create_new_int\n"
+
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
+		  	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		    
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "mov rbx, rax\n"
+		    "mov [rbx], r8\n"
+		    "push rbx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop rbx\n"
+		    "mov rcx, rax\n"
+		    "mov [rcx], r9\n"
+		    "push rbx\n"
+		    "push rcx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n" 
+		    "pop rcx\n"
+		    "pop rbx\n"
+                                               
+		  	"MAKE_LITERAL_FRACTION_WITH_REGS rax, rbx, rcx\n"
+		  	"jmp bin_div_finish\n"
+		          
+		   	"bin_div_create_new_int:\n"
+
+		   	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"
+		  	"push r8\n"
+
+		  	"mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop r8\n"
+		    "mov [rax], r8\n"
+          
+	        "bin_div_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_div_exit:\n")))
+
+(define cg-bin-mul
+	(lambda ()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_mul_body\n"
+            "mov [L_global16], rax\n"
+            "jmp bin_mul_exit\n"
+            
+            "bin_mul_body:\n"
+        	"push rbp\n"
+      		"mov rbp, rsp\n"
+      		"mov rcx ,arg_count\n"
+      		"mov rax ,An(0)\n"                
+
+      		"cmp rcx, 2\n"         			; nil + 1 arguments?
+      		"jne bin_mul_finish\n"
+     
+      		"mov rax ,qword [rax]\n"                     
+      		"mov rcx, rax\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_mul_arg1_int_check_arg2\n"
+      
+      		"bin_mul_arg1_frac_check_arg2:\n"
+      		"mov rbx, An(1)\n"
+       		"mov rbx, qword [rbx]\n"                    
+      		"mov rcx, rbx\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"jne bin_mul_arg1_frac_arg2_frac\n"
+      		"mov r10, rax\n"
+      		"mov rax, rbx\n"
+      		"mov rbx, r10\n"
+      		"jmp bin_mul_arg1_int_arg2_frac\n"
+      
+      		"bin_mul_arg1_frac_arg2_frac:\n"
+      		"mov rcx, rax\n"				
+      		"CAR rcx\n"
+      		"DATA rcx\n"					;rcx holds arg1 numerator	
+      		"mov r11, rax\n"      			;rdx keeps rax value
+      		"CDR r11\n"
+      		"DATA r11\n"
+      
+     		"mov r10, rbx\n"					
+      		"CAR r10\n"
+      		"DATA r10\n"					;r10 holds arg2 numerator
+      		"mov r12, rbx\n"				;r12 keeps r10 value
+      		"CDR r12\n"
+      		"DATA r12\n"
+      		"mov r8, r11\n"					;backup first denominator
+
+      		"MULT r11, r12\n"				;now r11 holds arg1 denominator * arg2 denominator
+      		"MULT r10, rcx\n"				;now r10 holds arg1 numerator * arg2 numerator
+      		"mov rax, r10\n"	
+      		"mov r12, r11\n"					
+      		"jmp bin_mul_simplify_and_create_fraction\n"                                             
+      		
+		  	"bin_mul_arg1_int_check_arg2:\n"
+		  	"mov rbx, An(1)\n"
+		  	"mov rbx, qword [rbx]\n"                    
+		  	"mov rdx, rbx\n"
+		  	"TYPE rdx\n"
+		  	"cmp rdx, T_INTEGER\n"
+		  	"je bin_mul_arg1_int_arg2_int\n"
+
+		  	"bin_mul_arg1_int_arg2_frac:\n"
+		  	"mov r10, rbx\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n";we will put in r10 second_numerator
+		  	"mov r12, rbx\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n";we will put in r12 second_denominator
+		  	"mov r8,rax\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r10\n"
+		  	
+		  	"mov rax,r8\n";now rax holds first_numerator*second_numerator
+
+		  	;rax holds new numerator
+		  	;r12 holds new denominator
+		  	"bin_mul_simplify_and_create_fraction:\n"
+		  	"mov r8,  rax\n"
+		  	"mov r9, r12\n"
+		  	"push r9\n"
+		  	"push r8\n"
+		  	"call simplify_fraction\n"
+		  	"add rsp, 16\n"
+		  	"jmp bin_mul_create_new_fraction\n"
+
+		  	"bin_mul_arg1_int_arg2_int:\n"
+		  	"DATA rbx\n" 
+		  	"DATA rax\n"
+		  	"mov r10, rax\n"     
+		  	"MULT rbx,r10\n"
+		  	"shl rbx, 4\n"
+		  	"or rbx, T_INTEGER\n"
+		  	"push rbx\n"
+		  	"mov rdi, 8\n"
+		  	"call malloc\n"
+		  	"pop rbx\n"
+		  	"mov [rax],rbx\n"
+		                        
+		  	"jmp bin_mul_finish\n"                     
+                    
+		  	"bin_mul_create_new_fraction:\n"
+		  	"cmp r9, 1\n"
+		  	"je bin_mul_create_new_int\n"
+
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
+		  	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		    
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "mov rbx, rax\n"
+		    "mov [rbx], r8\n"
+		    "push rbx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop rbx\n"
+		    "mov rcx, rax\n"
+		    "mov [rcx], r9\n"
+		    "push rbx\n"
+		    "push rcx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n" 
+		    "pop rcx\n"cg-bin-minus
+		    "pop rbx\n"
+                                               
+		  	"MAKE_LITERAL_FRACTION_WITH_REGS rax, rbx, rcx\n"
+		  	"jmp bin_mul_finish\n"
+		          
+		   	"bin_mul_create_new_int:\n"
+
+		   	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"
+		  	"push r8\n"
+
+		  	"mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop r8\n"
+		    "mov [rax], r8\n"
+          
+	        "bin_mul_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_mul_exit:\n")))
+
+(define cg-apply
+ 	(lambda()       
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, apply_body\n"
+            "mov [L_global11], rax\n"
+            "jmp apply_exit\n"
+            
+            "apply_body:\n"
+    		"push rbp\n"
+            "mov rbp, rsp\n"
+	        "mov rax, An(0)\n"				;closure
+	        "mov rax, qword [rax]\n"
+	        "mov r10, qword [rbp]\n" 		;old rbp
+	        "mov r11,qword [rbp+8]\n" 		;ret addr
+	        "mov r12, rbp\n"
+	        "add r12, 5*8\n"
+	        
+	        "mov rbx, rax\n" 
+	        "TYPE rbx\n"
+	        "cmp rbx, T_CLOSURE\n"
+	        "jne apply_finish\n"
+	         
+	        "mov rcx, An(1)\n"
+	        "mov rcx, qword [rcx]\n"
+	        "mov rbx, rcx\n"
+	        "TYPE rbx\n"
+	        "cmp rbx, T_PAIR\n"
+	        "je apply_start\n"
+
+	        "cmp rbx, T_NIL\n"
+	        "jne apply_finish\n"
+
+	        "apply_start:\n"
+	        "mov rsi, 0\n"
+
+		    "apply_calculate_list_length:\n"
+		    "cmp rbx, T_NIL\n"
+		    "je apply_calculate_list_length_done\n"
+		    "CDR rcx\n"
+		    "mov rbx, rcx\n"
+		    "TYPE rbx\n"
+		    "inc rsi\n"
+		    "jmp apply_calculate_list_length\n"
+
+	        "apply_calculate_list_length_done:\n"
+	        "shl rsi, 3\n"
+	        "sub r12, rsi\n"
+	        "shr rsi, 3\n"
+	        
+	        "mov rdi, 0\n"
+	        "mov rcx, An(1)\n"  			 
+	        "mov rcx, qword [rcx]\n"
+
+	        "apply_loop:\n"
+
+	        "cmp rdi, rsi\n"
+	        "je apply_loop_exit\n"
+	        "mov rbx, rcx\n"
+	        "DATA_UPPER rbx\n"
+			"add rbx, start_of_data\n"    
+	        "mov qword [r12 + 8*rdi], rbx\n"
+	        "CDR rcx\n"
+	        "inc rdi\n"
+	        "jmp apply_loop\n"
+	        
+	        "apply_loop_exit:\n"
+
+	        "sub r12, 8\n"
+	        "mov qword [r12],rsi\n"
+	        "sub r12, 8\n"
+	        "mov rbx, rax\n"
+	        "CLOSURE_ENV rbx\n"
+	        "mov qword [r12], rbx\n"
+	        "sub r12, 8\n"
+	        "mov qword [r12], r11\n"
+	        "mov rsp, r12\n"	        
+	        "mov rbp, r10\n"
+	        "mov rbx, rax\n"
+	        "TYPE rbx\n"
+	        
+	        "cmp rbx, T_CLOSURE\n"
+	        "jne apply_finish\n"
+	        "CLOSURE_CODE rax\n"
+	        "jmp rax\n"
+	        "apply_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "apply_exit:\n" )))
+
+(define cg-symbol->string
+	(lambda ()
+		(string-append
+			"mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, symbol_to_string_body\n"
+            "mov [L_global33], rax\n"
+            "jmp symbol_to_string_exit\n"
+            
+            "symbol_to_string_body:\n"
+    		"push rbp\n"
+            "mov rbp, rsp\n"
+            "mov rax, An(0)\n"
+            "mov rax, [rax]\n"
+            "DATA rax\n"
+			"add rax , start_of_data\n"
+	        "symbol_to_string_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "symbol_to_string_exit:\n" )))
+
+(define cg-vector
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, custom_vector_body\n"
+            "mov [L_global9], rax\n"
+            "jmp custom_vector_exit\n"
+            
+            "custom_vector_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+
+	        "push rbx\n"
+	        "shl rbx, 3\n"
+	        "mov rdi, rbx\n"
+	        "call malloc\n"
+	        "pop rbx\n"
+ 
+	        ;rax= pointer to address of rbx*8 bytes, rbx=length of vector
+	        "mov r10, 0\n" ;counter
+	        "for_vector:\n"
+	        "cmp r10, rbx\n"
+	        "je end_of_vector\n"
+
+	        "mov rdx, An(r10)\n" 
+	        "mov qword [rax+r10*8], rdx\n"
+	        "inc r10\n"
+	        "jmp for_vector\n"
+	        "end_of_vector:\n"
+
+	        "mov rcx, rax\n"
+	        "shl rbx, 3\n"
+	        "MAKE_LITERAL_VECTOR_WITH_REGS rcx, rbx\n" ;at the end of macro, rax is a literal vector
+	        "mov rcx, rax\n"
+	        "push rcx\n"
+	        "mov rdi, 8\n"
+	        "call malloc\n"
+	        "pop rcx\n"
+	        "mov [rax], rcx\n"
+
+	        "custom_vector_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "custom_vector_exit:\n" )))
+
+	(define cg-vector-length
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, vector_length_body\n"
+            "mov [L_global35], rax\n"
+            "jmp vector_length_exit\n"
+            
+            "vector_length_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne vector_length_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx,rax\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_VECTOR\n"
+	        "jne vector_length_finish\n"
+	        "VECTOR_LENGTH rbx\n"
+	        "shl rbx, TYPE_BITS\n"
+	        "add rbx, T_INTEGER\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "mov [rax], rbx\n"
+
+	        "vector_length_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "vector_length_exit:\n" )
+	))
+
+(define cg-vector-ref
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, vector_ref_body\n"
+            "mov [L_global36], rax\n"
+            "jmp vector_ref_exit\n"
+            
+            "vector_ref_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne vector_ref_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        
+	        "mov rcx, An(1)\n"
+	        "mov rcx, [rcx]\n"
+	        "mov rdx, rcx\n"
+	        "DATA rdx\n"
+
+	        "TYPE rax\n"
+	        "cmp rax, T_VECTOR\n"
+	        "jne vector_ref_finish\n"
+
+	        "TYPE rcx\n"
+	        "cmp rcx, T_INTEGER\n"
+	        "jne vector_ref_finish\n"
+
+	        "VECTOR_REF rcx, rbx, rdx\n"
+	        "push rcx\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "pop rcx\n"
+	        "mov [rax], rcx\n"
+
+	        "vector_ref_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "vector_ref_exit:\n" )))
+
+(define cg-vector-set
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, vector_set_body\n"
+            "mov [L_global37], rax\n"
+            "jmp vector_set_exit\n"
+            
+            "vector_set_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 3\n" 
+	 		"jne vector_set_finish\n"
+
+	 		"mov rax, An(0)\n" ;vector	        
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n" 
+
+	        "mov r11, An(1)\n" ;index
+	        "mov r11, [r11]\n"
+	        "mov rdx, r11\n"
+	        "DATA rdx\n"
+
+	       	"mov rcx, An(2)\n" ;address of item
+
+	        "TYPE rax\n"
+	        "cmp rax, T_VECTOR\n"
+	        "jne vector_set_finish\n"
+
+	        "TYPE r11\n"
+	        "cmp r11, T_INTEGER\n"
+	        "jne vector_set_finish\n"
+
+	        ;rbx=vector, rdx=index, rcx=item
+
+	        "mov r12, rbx\n"
+	        "VECTOR_ELEMENTS r12\n"
+	        "mov [r12 + rdx*8], rcx\n"
+
+	        "mov rax, const_1\n"
+
+	        "vector_set_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "vector_set_exit:\n" )))
+
 ;((0 null?) (1 boolean?) (2 char?) (3 integer?) (4 number?) (5 rational?) (6 pair?) (7 string?) (8 symbol?) (9 vector?) (10 procedure?) (11 apply) (12 b<) (13 b=) (14 b+) (15 b/) (16 b*) (17 b-) (18 car) (19 cdr) (20 char->integer) (21 cons) (22 denominator) (23 eq?) (24 integer->char) (25 make-string) (26 make-vector) (27 numerator) (28 remainder) (29 string-length) (30 string-ref) (31 string-set!) (32 string->symbol) (33 symbol->string) (34 vector) (35 vector-length) (36 vector-ref) (37 vector-set!) (38 not) (39 list) (40 x))
 
 
@@ -2274,6 +3302,29 @@
      (cg-vector-set)
      newLine
      (cg-string-set)
+     newLine
+     (cg-less-than)
+     newLine 
+     (cg-eq?)
+     newLine
+     (cg-bin-plus)
+     newLine
+     (cg-bin-div)
+     newLine
+     (cg-bin-mul)
+     newLine
+     (cg-bin-minus)
+     newLine
+     (cg-apply)
+     newLine
+     (cg-symbol->string)
+     newLine
+     (cg-vector)
+     newLine
+     (cg-vector-length)
+     newLine
+     (cg-vector-set)
+
      )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Type Checks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
