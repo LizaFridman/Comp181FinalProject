@@ -654,11 +654,15 @@
 		(make-linked-symb-list-func (- symbol_count 1) ) ;symbol_count
 		)))
 
-;(define master-symbol-builder
-;	(lambda (table) ;c-table
-;			(let* ((first (symb-table-make (get-symbols table)))
-;				(second (make-linked-symb-list)))			
-			;)))
+(define master-symbol-builder
+	(lambda (table) ;c-table
+			(let* ((firstPart (symb-table-make (get-symbols table)))
+				   (secondPart (make-linked-symb-list)))			
+				(string-append
+				firstPart
+				secondPart
+				"mov [SymbolTable], eax \n"
+				))))
 
 
 
@@ -1394,30 +1398,28 @@
 
 (define cg-cons
     (lambda()
-      (string-append
-       ";; cg-cons" newLine
-       "mov rdi, 16\n"
-       "call malloc\n"
-       "mov rbx, qword 0\n"
-       "MAKE_LITERAL_CLOSURE rax, rbx, cons_body\n"
-       "mov [L_cons], rax\n"
-       "jmp cons_exit\n"
-       "cons_body:\n"
-       "push rbp\n"
-       "mov rbp, rsp\n"
-       "mov rbx, arg_count\n"
-       "cmp rbx, 2\n" 
-       "jne cons_finish\n"
-       "mov rdi, 8\n"
-       "call malloc\n"
-       "mov rcx, An(0)\n"
-       "mov rdx, An(1)\n"
-       "MAKE_MALLOC_LITERAL_PAIR rax, rcx, rdx\n"
-       "cons_finish:\n"
-       "leave\n"
-       "ret\n"
-       "cons_exit:\n")))
-
+        (string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, cons_body\n"
+            "mov [L_global21], rax\n"
+            "jmp cons_exit\n"
+            "cons_body:\n"
+            "push rbp\n"
+			"mov rbp, rsp\n"
+			"mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne cons_finish\n"
+            "mov rdi, 8\n"
+            "call malloc\n"
+            "mov rcx, An(0)\n"
+            "mov rdx, An(1)\n"
+            "MAKE_MALLOC_LITERAL_PAIR rax, rcx, rdx\n"
+            "cons_finish:\n"
+        	"leave\n"
+            "ret\n"
+            "cons_exit:\n")))
 (define cg-car
     (lambda()
         (string-append
@@ -1425,7 +1427,7 @@
             "call malloc\n"
             "mov rbx, qword 0\n"
             "MAKE_LITERAL_CLOSURE rax, rbx, car_body\n"
-            "mov [L_car], rax\n"
+            "mov [L_global2], rax\n"
             "jmp car_exit\n"
             "car_body:\n"
             "push rbp\n"
@@ -1445,7 +1447,7 @@
             "call malloc\n"
             "mov rbx, qword 0\n"
             "MAKE_LITERAL_CLOSURE rax, rbx, cdr_body\n"
-            "mov [L_cdr], rax\n"
+            "mov [L_global19], rax\n"
             "jmp cdr_exit\n"
             "cdr_body:\n"
             "push rbp\n"
@@ -1465,10 +1467,10 @@
             "call malloc\n"
             "mov rbx, qword 0\n"
             "MAKE_LITERAL_CLOSURE rax, rbx, symbol_to_string_body\n"
-            "mov [symbol_to_string], rax\n"
+            "mov [L_global7], rax\n"
             "jmp symbol_to_string_exit\n"
             
-            "L_symbol_string:\n"
+            "symbol_to_string_body:\n"
     		"push rbp\n"
             "mov rbp, rsp\n"
             "mov rax, An(0)\n"
@@ -1487,15 +1489,15 @@
             "call malloc\n"
             "mov rbx, qword 0\n"
             "MAKE_LITERAL_CLOSURE rax, rbx, string_to_symbol_body\n"
-            "mov qword [string_to_symbol], rax\n"
+            "mov qword [L_global32], rax\n"
             "jmp string_to_symbol_exit\n"
             
-            "L_string_symbol:\n"
+            "string_to_symbol_body:\n"
 			"push rbp\n"
 			"mov rbp, rsp\n"
 			"mov r11, An(0)\n" ;r11= pointer to arg
 			;"mov r11, [r11]\n"
-		    "mov r10, [symbol_table]\n" ;content of fymbol_table, either a pair or const_2
+		    "mov r10, [SymbolTable]\n" ;content of fymbol_table, either a pair or const_2
 		    ;"mov r10, [r10]\n"				
 	        "cmp r10, const_2\n" 
 	        "je string_to_symbol_create_symbol\n"
@@ -1535,7 +1537,7 @@
 	        "MAKE_MALLOC_LITERAL_SYMBOL rax , r11\n"
 			"mov r11, rax\n"
       		"mov r13, r11\n"                    ;backup
-      		"mov r14, [symbol_table]\n"       
+      		"mov r14, [SymbolTable]\n"       
       
       		"push r11\n"
       		"push r14\n"
@@ -1544,7 +1546,7 @@
        		"pop r14\n"
        		"pop r11\n"
        		"MAKE_MALLOC_LITERAL_PAIR rax, r11 ,r14\n"
-      		"mov [symbol_table],rax\n"
+      		"mov [SymbolTable],rax\n"
       		"mov rax, r13\n"
 
 	        "string_to_symbol_finish:\n"
@@ -1555,50 +1557,665 @@
 
 
 
+(define cg-char->integer
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, char_to_integer_body\n"
+            "mov [L_global20], rax\n"
+            "jmp char_to_integer_exit\n"
+            
+            "char_to_integer_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne char_to_integer_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_CHAR\n"
+	        "jne char_to_integer_finish\n"
+
+	        "sub rbx, T_CHAR\n"
+	        "or rbx, T_INTEGER\n"
+
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "mov qword [rax], rbx\n"
+
+	        "char_to_integer_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "char_to_integer_exit:\n" )
+	))
+
+
+
+
+
+(define cg-integer->char
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, integer_to_char_body\n"
+            "mov [L_global24], rax\n"
+            "jmp integer_to_char_exit\n"
+            
+            "integer_to_char_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne integer_to_char_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "jne integer_to_char_finish\n"
+
+	        "sub rbx, T_INTEGER\n"
+	        "or rbx, T_CHAR\n"
+
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "mov qword [rax], rbx\n"
+
+	        "integer_to_char_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "integer_to_char_exit:\n" )
+	))
+
+
+
+(define cg-numerator
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, numerator_body\n"
+            "mov [L_global27], rax\n"
+            "jmp numerator_exit\n"
+            
+            "numerator_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne numerator_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "je get_integer_numerator\n"
+	        "cmp rax, T_FRACTION\n"
+	        "jne numerator_finish\n"
+	        "mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+
+	        "DATA_UPPER rax\n"
+			"add rax, start_of_data\n"
+	        "jmp numerator_finish\n"
+
+	        "get_integer_numerator:\n"
+	        "mov rax, An(0)\n"
+
+	        "numerator_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "numerator_exit:\n" )
+	))
+
+
+(define cg-denominator
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, denominator_body\n"
+            "mov [L_global22], rax\n"
+            "jmp denominator_exit\n"
+            
+            "denominator_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne denominator_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "je get_integer_denominator\n"
+	        "cmp rax, T_FRACTION\n"
+	        "jne denominator_finish\n"
+	        "mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "DATA_LOWER rax\n"
+			"add rax, start_of_data\n"
+	        "jmp denominator_finish\n"
+
+	        "get_integer_denominator:\n"
+	        "mov rbx, MAKE_LITERAL(T_INTEGER,1)\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"    
+	        "mov qword [rax], rbx\n"
+
+	        "denominator_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "denominator_exit:\n" )
+	))
+
+
+
+(define cg-eq
+ 	(lambda()       
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, eq?_body\n"
+            "mov [L_global23], rax\n"
+            "jmp eq?_exit\n"
+            
+            "eq?_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne eq?_finish\n"
+
+	 		"mov rax, An(0)\n"
+	 		"mov rax, [rax]\n"
+	 		"mov rbx, An(1)\n"
+	 		"mov rbx, [rbx]\n"
+	        "cmp rax, rbx\n"
+	        "je eq?_true\n"
+	        "mov rax, const_4\n"
+	        "jmp eq?_finish\n"
+	        
+	        "eq?_true:\n"
+	        "mov rax, const_3\n"
+
+	        "eq?_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "eq?_exit:\n" )))
+
+
+
+(define cg-make-string
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, make_string_body\n"
+            "mov [L_global25], rax\n"
+            "jmp make_string_exit\n"
+            
+            "make_string_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"
+			"mov rdx, qword 0\n" ;initialize char with 0         
+            "mov r9, arg_count\n"
+	        "cmp r9, 2\n"
+	 		"jg make_string_finish\n"
+
+	 		"mov rax, An(0)\n" ;length of string	        
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        "DATA rbx\n" 
+
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "jne make_string_finish\n"
+
+	        "cmp r9, 1\n"
+	        "je start_creating_string\n"
+
+	        "mov rcx, An(1)\n" ;char
+	        "mov rcx, [rcx]\n"
+	        "mov rdx, rcx\n"
+	        "DATA rdx\n"
+
+	        "TYPE rcx\n"
+	        "cmp rcx, T_CHAR\n"
+	        "jne make_string_finish\n"
+
+	        "start_creating_string:\n"
+
+	        "push rbx\n"
+	        "push rdx\n"
+	        "mov rdi, rbx\n"
+	        "call malloc\n"
+	        "pop rdx\n"
+	        "pop rbx\n"
+
+ 
+	        ;rax= pointer to address of rbx bytes, rbx=length of string, rdx=char
+	        "mov r10, 0\n" ;counter
+
+	        "for_create_string:\n"
+	        "cmp r10, rbx\n"
+	        "je end_of_create_string\n"
+	        "mov byte [rax+r10], dl\n"
+	        "inc r10\n"
+	        "jmp for_create_string\n"
+	        "end_of_create_string:\n"
+
+	        "mov rcx, rax\n"
+
+	        "MAKE_LITERAL_STRING_WITH_REGS rcx, rbx\n" ;at the end of macro, rax is a literal string
+	        "mov rcx, rax\n"
+	        "push rcx\n"
+	        "mov rdi, 8\n"
+	        "call malloc\n"
+	        "pop rcx\n"
+
+	        "mov [rax], rcx\n"
+
+	        "make_string_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "make_string_exit:\n" )))
+
+
+
+
+(define cg-make-vector
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, make_vector_body\n"
+            "mov [L_global26], rax\n"
+            "jmp make_vector_exit\n"
+            
+            "make_vector_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"  
+			;initialize item with 0
+			"mov rdi, 8\n"
+			"call malloc\n"
+			"mov rdx, 0\n"
+			"shl rdx, TYPE_BITS\n"
+	        "add rdx, T_INTEGER\n"       
+            "mov rbx, arg_count\n"
+            "mov [rax], rdx\n" 
+            "mov rdx, rax\n" ;now rdx conatins integer 0
+	        "cmp rbx, 2\n" 
+	 		"jg make_vector_finish\n"
+
+	 		"mov rax, An(0)\n" ;length of vector	        
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        "DATA rbx\n" 
+
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "jne make_vector_finish\n"
+
+	        "mov r9, arg_count\n"
+	        "cmp r9, 1\n"
+	        "je start_creating_vector\n"
+	        "mov rdx, An(1)\n" ; address of item
+
+	        "start_creating_vector:\n"
+
+	        "push rbx\n"
+	        "push rdx\n"
+	        "shl rbx, 3\n"
+	        "mov rdi, rbx\n"
+	        "call malloc\n"
+	        "pop rdx\n"
+	        "pop rbx\n"
+ 
+	        ;rax= pointer to address of rbx*8 bytes, rbx=length of vector, rdx=address of item
+	        "mov r10, 0\n" ;counter
+
+	        "for_create_vector:\n"
+	        "cmp r10, rbx\n"
+	        "je end_of_create_vector\n"
+	        "mov qword [rax+r10*8], rdx\n"
+	        "inc r10\n"
+	        "jmp for_create_vector\n"
+	        "end_of_create_vector:\n"
+
+	        "mov rcx, rax\n"
+	        "shl rbx, 3\n"
+	        "MAKE_LITERAL_VECTOR_WITH_REGS rcx, rbx\n" ;at the end of macro, rax is a literal vector
+	        "mov rcx, rax\n"
+	        "push rcx\n"
+	        "mov rdi, 8\n"
+	        "call malloc\n"
+	        "pop rcx\n"
+	        "mov [rax], rcx\n"
+
+	        "make_vector_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "make_vector_exit:\n" )))
+	
+
+	(define cg-remainder
+ 	(lambda()       
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, remainder_body\n"
+            "mov [L_global28], rax\n"
+            "jmp remainder_exit\n"
+            
+            "remainder_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne remainder_finish\n"
+
+	 		"mov rax, An(0)\n"
+	 		"mov rax, [rax]\n"
+	 		"mov rcx, rax\n"
+	 		"mov rbx, An(1)\n"
+	 		"mov rbx, [rbx]\n"
+	 		"mov r10, rbx\n"
+	 		"TYPE rcx\n"
+	        "cmp rcx, T_INTEGER\n"
+	        "jne remainder_finish\n"
+	        "TYPE rbx\n"
+	        "cmp rbx, T_INTEGER\n"
+	        "jne remainder_finish\n"
+	        "DATA rax\n"
+	        "mov r9, rax\n"
+	        "DATA r10\n"
+	        "mov rdx, qword 0\n"
+	      
+	        "cmp r9, 0\n"
+	        "jge is_not_negative1\n"
+	        "neg rax\n"
+	        "is_not_negative1:\n"
+	        "mov rdx, qword 0\n"
+	        "idiv r10\n"
+	        "cmp r9, 0\n"
+	        "jge is_not_negative2\n"
+	        "neg rdx\n"
+	        "is_not_negative2:\n"
+
+	        "shl rdx, TYPE_BITS\n"
+	        "add rdx, T_INTEGER\n"
+	        "push rdx\n"
+	        "mov rdi, 8\n"
+	        "call malloc\n"
+	        "pop rdx\n"
+	        "mov [rax], rdx\n"
+	        
+	        "remainder_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "remainder_exit:\n" )))
+
+
+
+(define cg-string-length
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, string_length_body\n"
+            "mov [L_global29], rax\n"
+            "jmp string_length_exit\n"
+            
+            "string_length_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne string_length_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx,rax\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_STRING\n"
+	        "jne string_length_finish\n"
+	        "STRING_LENGTH rbx\n"
+	        "shl rbx, TYPE_BITS\n"
+	        "add rbx, T_INTEGER\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "mov [rax], rbx\n"
+
+	        "string_length_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "string_length_exit:\n" )
+	))
+
+
+
+(define cg-string-ref
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, string_ref_body\n"
+            "mov [L_global30], rax\n"
+            "jmp string_ref_exit\n"
+            
+            "string_ref_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne string_ref_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        
+	        "mov rcx, An(1)\n"
+	        "mov rcx, [rcx]\n"
+	        "mov rdx, rcx\n"
+	        "DATA rdx\n"
+
+	        "TYPE rax\n"
+	        "cmp rax, T_STRING\n"
+	        "jne string_ref_finish\n"
+
+	        "TYPE rcx\n"
+	        "cmp rcx, T_INTEGER\n"
+	        "jne string_ref_finish\n"
+
+	        "STRING_REF cl, rbx, rdx\n"
+	        "shl rcx, TYPE_BITS\n"
+	        "add rcx, T_CHAR\n"
+	        "push rcx\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "pop rcx\n"
+	        "mov [rax], rcx\n"
+
+	        "string_ref_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "string_ref_exit:\n" )))
+
+
+
+(define cg-string-set
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, string_set_body\n"
+            "mov [L_global31], rax\n"
+            "jmp string_set_exit\n"
+            
+            "string_set_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 3\n" 
+	 		"jne string_set_finish\n"
+
+	 		"mov rax, An(0)\n" ;string	        
+	        
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n" 
+
+	        "mov r11, An(1)\n" ;index
+	        "mov r11, [r11]\n"
+	        "mov rdx, r11\n"
+	        "DATA rdx\n"
+
+	       	"mov r10, An(2)\n" ;char
+	        "mov r10, [r10]\n"
+	        "mov rcx, r10\n"
+	        "DATA rcx\n"
+
+	        "TYPE rax\n"
+	        "cmp rax, T_STRING\n"
+	        "jne string_set_finish\n"
+
+	        "TYPE r11\n"
+	        "cmp r11, T_INTEGER\n"
+	        "jne string_set_finish\n"
+
+	       	"TYPE r10\n"
+	        "cmp r10, T_CHAR\n"
+	        "jne string_set_finish\n"
+
+	        ;rbx=string, rdx=index, rcx=char
+
+	        "mov r12, rbx\n"
+	        "STRING_ELEMENTS rbx\n"
+			"add rbx, rdx\n"
+			"mov byte [rbx], cl\n"
+
+	        "mov rax, const_1\n"
+
+	        "string_set_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "string_set_exit:\n" )))
+
+
+
+(define cg-vector-set
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, vector_set_body\n"
+            "mov [L_global37], rax\n"
+            "jmp vector_set_exit\n"
+            
+            "vector_set_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 3\n" 
+	 		"jne vector_set_finish\n"
+
+	 		"mov rax, An(0)\n" ;vector	        
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n" 
+
+	        "mov r11, An(1)\n" ;index
+	        "mov r11, [r11]\n"
+	        "mov rdx, r11\n"
+	        "DATA rdx\n"
+
+	       	"mov rcx, An(2)\n" ;address of item
+
+	        "TYPE rax\n"
+	        "cmp rax, T_VECTOR\n"
+	        "jne vector_set_finish\n"
+
+	        "TYPE r11\n"
+	        "cmp r11, T_INTEGER\n"
+	        "jne vector_set_finish\n"
+
+	        ;rbx=vector, rdx=index, rcx=item
+
+	        "mov r12, rbx\n"
+	        "VECTOR_ELEMENTS r12\n"
+	        "mov [r12 + rdx*8], rcx\n"
+
+	        "mov rax, const_1\n"
+
+	        "vector_set_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "vector_set_exit:\n" )))
+
+;((0 null?) (1 boolean?) (2 char?) (3 integer?) (4 number?) (5 rational?) (6 pair?) (7 string?) (8 symbol?) (9 vector?) (10 procedure?) (11 apply) (12 b<) (13 b=) (14 b+) (15 b/) (16 b*) (17 b-) (18 car) (19 cdr) (20 char->integer) (21 cons) (22 denominator) (23 eq?) (24 integer->char) (25 make-string) (26 make-vector) (27 numerator) (28 remainder) (29 string-length) (30 string-ref) (31 string-set!) (32 string->symbol) (33 symbol->string) (34 vector) (35 vector-length) (36 vector-ref) (37 vector-set!) (38 not) (39 list) (40 x))
+
 
 (define built-in-map
   ;; <func-name, func-label>
-  '((null? null-pred-label)
-    (boolean? bool-pred-label)
-    (char? char-pred-label)
-    (integer? integer-pred-label)
-    (number? number-pred-label)
-    (rational? rational-pred-label)
-    (pair? pair-pred-label)
-    (string? string-pred-label)
-    (symbol? symbol-pred-label)
-    (vector? vector-pred-label)
-    (procedure? "L_closure_check")
+  '((null?  "L_global0")
+    (boolean? "L_global1")
+    (char? "L_global2")
+    (integer? "L_global3")
+    (number? "L_global4")
+    (rational? "L_global5")
+    (pair? "L_global6")
+    (string? "L_global7")
+    (symbol? "L_global8")
+    (vector? "L_global9")
+    (procedure? "L_global10")
 
-    (apply "L_apply")
+    (apply "L_global11")
 
-    (b< "L_less_b")
-    (b= "L_equal_b")
-    (b+ "L_add_b")
-    (b/ "L_div_b")
-    (b* "L_mult_b")
-    (b- "L_sub_b")
+    (b< "L_global12")
+    (b= "L_global13")
+    (b+ "L_global14")
+    (b/ "L_global15")
+    (b* "L_global16")
+    (b- "L_global17")
 
-    (car "L_car")
-    (cdr "L_cdr")
-    (char->integer "L_char_integer")
-    (cons "L_cons")
-    (denominator "L_denominator")
-    (eq? "L_eq")
-    (integer->char "L_integer_char")
-    (make-string "L_make_string")
-    (make-vector "L_make_vector")
-    (numerator "L_numerator")
-    (remainder "L_remainder")
-    (string-length "L_string_length")
-    (string-ref "L_string_ref")
-    (string-set! "L_string_set")
-    (string->symbol "L_string_symbol")
-    (symbol->string "L_symbol_string")
-    (vector "L_vector")
-    (vector-length "L_vector_length")
-    (vector-ref "L_vector_ref")
-    (vector-set! "L_vector_set")))
+    (car "L_global18")
+    (cdr "L_global19")
+    (char->integer "L_global20")
+    (cons "L_global21")
+    (denominator "L_global22")
+    (eq? "L_global23")
+    (integer->char "L_global24")
+    (make-string "L_global25")
+    (make-vector "L_global26")
+    (numerator "L_global27")
+    (remainder "L_global28")
+    (string-length "L_global29")
+    (string-ref "L_global30")
+    (string-set! "L_global31")
+    (string->symbol "L_global32")
+    (symbol->string "L_global33")
+    (vector "L_global34")
+    (vector-length "L_global35")
+    (vector-ref "L_global36")
+    (vector-set! "L_global37")))
 
 (define built-in-funcs
   (map first built-in-map))
@@ -1641,6 +2258,28 @@
      cg-symbol->string
      newLine
      cg-string->symbol
+     newLine
+     cg-integer->char 
+     newLine 
+     cg-char->integer
+     newLine
+     cg-numerator 
+     newLine
+     cg-eq
+     newLine
+     cg-make-string
+     newLine
+     cg-make-vector
+     newLine
+     cg-remainder
+     newLine
+     cg-string-length
+     newLine
+     cg-string-ref
+     newLine
+     cg-vector-set
+     newLine
+     cg-string-set
      )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Type Checks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
