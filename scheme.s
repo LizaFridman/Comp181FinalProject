@@ -195,7 +195,83 @@
 	pop rax 
 %endmacro
 	
-	
+%macro STRING_COMPARE 2
+	push rbx
+	push rcx
+	push rdx
+	push r8
+	push r9
+	mov rcx,[%1]
+	mov r9,rcx
+	mov rbx,[%2]
+	mov r8,rbx
+	STRING_LENGTH rcx
+	STRING_LENGTH rbx
+
+	cmp rcx,rbx
+	jne .names_not_equal
+
+	mov rdx,0
+
+	.cmp_loop:
+	cmp rdx,rcx
+	je .names_equal
+
+	xor rbx,rbx
+	STRING_REF bh,r9,rdx
+	STRING_REF bl,r8,rdx
+	cmp bl,bh
+	jne .names_not_equal
+
+	inc rdx
+	jmp .cmp_loop
+
+	.names_equal:
+	mov rax, L_const4
+	jmp .end_macro
+
+	.names_not_equal:
+	mov rax, L_const2
+
+	.end_macro:
+	pop r9
+	pop r8
+	pop rdx
+	pop rcx
+	pop rbx
+%endmacro
+
+;;; MAKE_MALLOC_LITERAL_SYMBOL target-address, str-address
+%macro MAKE_MALLOC_LITERAL_SYMBOL 2
+	push rax 
+	mov rax, %1 
+	mov qword [rax], %2
+	sub qword [rax], start_of_data
+	shl qword [rax], TYPE_BITS 
+	or qword [rax], T_SYMBOL
+	pop rax 
+%endmacro
+
+%macro MAKE_LITERAL_STRING_WITH_REGS 2
+	shl %2, 30
+	mov rax, %2
+	or rax, %1
+	sub rax, start_of_data
+	shl rax, TYPE_BITS
+	or rax, T_STRING
+%endmacro
+
+
+%macro MAKE_LITERAL_VECTOR_WITH_REGS 2
+	shr %2, 3
+	shl %2, 30
+	mov rax, %2
+	or rax, %1
+	sub rax, start_of_data
+	shl rax, TYPE_BITS
+	or rax, T_VECTOR
+%endmacro
+
 %define SOB_UNDEFINED MAKE_LITERAL(T_UNDEFINED, 0)
 %define SOB_VOID MAKE_LITERAL(T_VOID, 0)
 %define SOB_FALSE MAKE_LITERAL(T_BOOL, 0)

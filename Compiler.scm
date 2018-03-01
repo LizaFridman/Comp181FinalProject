@@ -848,7 +848,7 @@
 (define cg-fvar ;var needs to be the symbol
   (lambda (var)
     (string-append
-    tab "MOV RAX, " fvar-label (number->string (f-table-get var)) newLine)))
+    tab "MOV RAX, [" fvar-label (number->string (f-table-get var)) "]" newLine)))
 
 ;;; If3
 (define sobNull
@@ -996,7 +996,7 @@
   ;; Rax = generated closure
   (lambda (continue-label)
     (string-append
-     tab "MOV RAX, qword [RAX]" newLine
+     ;;tab "MOV RAX, qword [RAX]" newLine
      tab "MOV RAX, qword [RAX]" newLine
      tab "TYPE rax" newLine
      tab "CMP rax, T_CLOSURE" newLine
@@ -1012,40 +1012,33 @@
 (define cg-applic
   (lambda (proc args)
     (let* ((args-length (length args))
-	   (string-length (number->string args-length))
-	   (pass-label (begin
-			 (set! applic-num (+ 1 applic-num))
-			 (string-append ".closure_"
-					(number->string applic-num)
-					"_check_passed"))))
+	   (string-length (number->string args-length)))
 	   ;;(display (format "Code-gen Applic:\nargs-length = ~a\nString-length = ~a\n" args-length  string-length))
       (string-append
        ";; cg-applic" newLine
        (cg-push-args args)
        newLine
-       tab "XOR rbx, rbx" newLine
-       tab "MOV rbx, " string-length newLine
-       tab "PUSH rbx" newLine ;; num of args
+       ;;tab "XOR rbx, rbx" newLine
+       ;;tab "MOV rbx, " string-length newLine
+       tab "PUSH " string-length newLine ;; num of args
        ;;tab "PUSH " (number->string args-length) newLine
        newLine
        (code-gen proc) ;;Rax = Closure value
        newLine
-       tab "PUSH rax" newLine
-       (cg-check-T-closure pass-label)
+       tab "MOV rax, [rax]" newLine
+       tab "MOV rbx, rax" newLine
+       tab "TYPE rbx" newLine
        newLine
-       pass-label ":" newLine
-       tab "POP rax" newLine
-       tab "MOV rax, [rax]" newLine
-       tab "MOV rax, [rax]" newLine
+       tab "CMP rbx, T_CLOSURE" newLine
+       tab "JNE .end_applic" (number->string applic-num) newLine
+       newLine
        tab "MOV rbx, rax" newLine
        tab "CLOSURE_ENV rbx" newLine
        tab "PUSH rbx" newLine ;; Env
        tab "CLOSURE_CODE rax" newLine
        tab "call rax" newLine
-       
-       tab "POP rbx" newLine ;; Closure_Env
-       tab "POP rbx" newLine ;; Args-length
-       (cg-pop-args args);; Pop Arguments
+       ".end_applic" (number->string applic-num) ":" newLine
+       tab "ADD rsp, "  (number->string (* 8 (+ 2 args-length))) newLine
        ))))
 
 ;;; Define
@@ -1353,9 +1346,10 @@
 		   ;;(master-symbol-builder ct)
 		   ;;"mov [SymbolTable], rax \n"
 		   newLine
-		   (cg-built-in-closures (filter (lambda (row)
-						   (built-in? (second row)))
-						 f-table))
+		   (cg-built-in)
+		   ;;(cg-built-in-closures (filter (lambda (row)
+						   ;;(built-in? (second row)))
+		   ;;f-table))
 		   )))
 
 
@@ -1499,7 +1493,7 @@
 			;"mov r11, [r11]\n"
 		    "mov r10, [SymbolTable]\n" ;content of fymbol_table, either a pair or const_2
 		    ;"mov r10, [r10]\n"				
-	        "cmp r10, const_2\n" 
+	        "cmp r10, L_const1\n" 
 	        "je string_to_symbol_create_symbol\n"
     		
 	        "string_to_symbol_loop:\n"
@@ -1512,13 +1506,13 @@
 			"add r12 , start_of_data\n"
       		;"cmp r12, r11\n"  
       		"STRING_COMPARE r12, r11\n"
-      		"cmp rax, const_3\n" 
+      		"cmp rax, L_const4\n" 
 	        "je string_to_symbol_found\n"
 		    ;"CDR r10\n"
 		    "mov r10, [r10]\n"
 		    "DATA_LOWER r10\n"
 			"add r10, start_of_data\n"
-			"cmp r10, const_2\n"
+			"cmp r10, L_const1\n"
       		"je string_to_symbol_create_symbol\n"
 	        "jmp string_to_symbol_loop\n"
 	            
@@ -1559,39 +1553,39 @@
 
 (define cg-char->integer
 	(lambda()
-		(string-append
-            "mov rdi, 16\n"
-            "call malloc\n"
-            "mov rbx, qword 0\n"
-            "MAKE_LITERAL_CLOSURE rax, rbx, char_to_integer_body\n"
-            "mov [L_global20], rax\n"
-            "jmp char_to_integer_exit\n"
-            
-            "char_to_integer_body:\n"
-        	"push rbp\n"
-			"mov rbp, rsp\n"         
-            "mov rbx, arg_count\n"
-	        "cmp rbx, 1\n" 
-	 		"jne char_to_integer_finish\n"
-
-	 		"mov rax, An(0)\n"
-	        "mov rax, [rax]\n"
-	        "mov rbx, rax\n"
-	        "TYPE rax\n"
-	        "cmp rax, T_CHAR\n"
-	        "jne char_to_integer_finish\n"
-
-	        "sub rbx, T_CHAR\n"
-	        "or rbx, T_INTEGER\n"
-
-	        "mov rdi,8\n"
-	        "call malloc\n"
-	        "mov qword [rax], rbx\n"
-
-	        "char_to_integer_finish:\n"
-	        "leave\n"
-	        "ret\n"
-	        "char_to_integer_exit:\n" )
+	  (string-append
+	   "mov rdi, 16\n"
+	   "call malloc\n"
+	   "mov rbx, qword 0\n"
+	   "MAKE_LITERAL_CLOSURE rax, rbx, char_to_integer_body\n"
+	   "mov [L_global20], rax\n"
+	   "jmp char_to_integer_exit\n"
+	   
+	   "char_to_integer_body:\n"
+	   "push rbp\n"
+	   "mov rbp, rsp\n"         
+	   "mov rbx, arg_count\n"
+	   "cmp rbx, 1\n" 
+	   "jne char_to_integer_finish\n"
+	   
+	   "mov rax, An(0)\n"
+	   "mov rax, [rax]\n"
+	   "mov rbx, rax\n"
+	   "TYPE rax\n"
+	   "cmp rax, T_CHAR\n"
+	   "jne char_to_integer_finish\n"
+	   
+	   "sub rbx, T_CHAR\n"
+	   "or rbx, T_INTEGER\n"
+	   
+	   "mov rdi,8\n"
+	   "call malloc\n"
+	   "mov qword [rax], rbx\n"
+	   
+	   "char_to_integer_finish:\n"
+	   "leave\n"
+	   "ret\n"
+	   "char_to_integer_exit:\n" )
 	))
 
 
@@ -1745,11 +1739,11 @@
 	 		"mov rbx, [rbx]\n"
 	        "cmp rax, rbx\n"
 	        "je eq?_true\n"
-	        "mov rax, const_4\n"
+	        "mov rax, L_const2\n"
 	        "jmp eq?_finish\n"
 	        
 	        "eq?_true:\n"
-	        "mov rax, const_3\n"
+	        "mov rax, L_const4\n"
 
 	        "eq?_finish:\n"
 	        "leave\n"
@@ -2112,7 +2106,7 @@
 			"add rbx, rdx\n"
 			"mov byte [rbx], cl\n"
 
-	        "mov rax, const_1\n"
+	        "mov rax, L_const0\n"
 
 	        "string_set_finish:\n"
 	        "leave\n"
@@ -2163,7 +2157,7 @@
 	        "VECTOR_ELEMENTS r12\n"
 	        "mov [r12 + rdx*8], rcx\n"
 
-	        "mov rax, const_1\n"
+	        "mov rax, L_const0\n"
 
 	        "vector_set_finish:\n"
 	        "leave\n"
@@ -2249,37 +2243,37 @@
      newLine
      cg-closure?
      newLine
-     cg-cons
+     (cg-cons)
      newLine
-     cg-car 
+     (cg-car)
      newLine
-     cg-cdr
+     (cg-cdr)
      newLine
-     cg-symbol->string
+     (cg-symbol->string)
      newLine
-     cg-string->symbol
+     (cg-string->symbol)
      newLine
-     cg-integer->char 
+     (cg-integer->char)
      newLine 
-     cg-char->integer
+     (cg-char->integer)
      newLine
-     cg-numerator 
+     (cg-numerator)
      newLine
-     cg-eq
+     (cg-eq)
      newLine
-     cg-make-string
+     (cg-make-string)
      newLine
-     cg-make-vector
+     (cg-make-vector)
      newLine
-     cg-remainder
+     (cg-remainder)
      newLine
-     cg-string-length
+     (cg-string-length)
      newLine
-     cg-string-ref
+     (cg-string-ref)
      newLine
-     cg-vector-set
+     (cg-vector-set)
      newLine
-     cg-string-set
+     (cg-string-set)
      )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Type Checks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2287,8 +2281,10 @@
 (define cg-type-check
   (lambda (type-label . sub-types)
     (string-append
+     tab "" newLine
      type-label ":" newLine
-     tab "enter" newLine
+     tab "push rbp" newLine
+     tab "mov rbp, rsp" newLine
      tab "PUSHA" newLine
      tab "MOV rax, [rbp + 8 + 1*8]" newLine
 
