@@ -1,3 +1,0 @@
-
-(define a 'hello)
-a

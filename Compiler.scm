@@ -1,6 +1,6 @@
-(load "sexpr-parser.scm")
-(load "tag-parser.scm")
-(load "semantic-analyzer.scm")
+(load "project/sexpr-parser.scm")
+(load "project/tag-parser.scm")
+(load "project/semantic-analyzer.scm")
 
 (define first
   (lambda (lst)
@@ -87,7 +87,7 @@
 (define compile-scheme-file
   (lambda (source dest)
     (let* ((exprs (file->list source))
-	   (built-in (file->list "Built-in.scm"))
+	   (built-in (file->list "project/Built-in.scm"))
 	   (pipelined (pipeline (append built-in exprs)))
 	   (size (length pipelined)))
       ;;(display (format "Pipelined = ~a\n" pipelined))
@@ -1318,7 +1318,7 @@
 (define generate-pre-text
   (lambda (ct ft)
     ;;(display (format "Generating Prolog\n"))
-    (string-append "%include \"scheme.s\"" newLine
+    (string-append "%include \"project/scheme.s\"" newLine
 		   param-get-def
 		   newLine
 		   "section .bss" newLine

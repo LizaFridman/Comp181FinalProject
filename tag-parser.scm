@@ -1,4 +1,4 @@
-(load "qq.scm")
+(load "project/qq.scm")
 
 (define *reserved-words*
   '(and begin cond define do else if lambda 
