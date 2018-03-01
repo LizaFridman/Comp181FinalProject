@@ -2281,8 +2281,15 @@
 (define cg-type-check
   (lambda (type-label . sub-types)
     (string-append
-     tab "" newLine
-     type-label ":" newLine
+     type-label "_create_closure:" newLine
+     "mov rdi, 16\n"
+     "call malloc\n"
+     "mov rbx, qword 0\n"
+     "MAKE_LITERAL_CLOSURE rax, rbx, " type-label "_body\n"
+     "mov [" type-label "], rax\n"
+     "jmp " type-label "_exit\n"
+     
+     type-label "_body:" newLine
      tab "push rbp" newLine
      tab "mov rbp, rsp" newLine
      tab "PUSHA" newLine
@@ -2306,62 +2313,100 @@
      
      tab "POPA" newLine
      tab "leave" newLine
-     tab "ret" newLine)))
+     tab "ret" newLine
+     type-label "_exit:")))
 
-(define null-pred-label "L_null_check")
+(define validate-type-code-gen
+  
+  (lambda (type-label tag)
+    (let ((lower-case-type-label (string-downcase type-label)))
+      (string-append
+       lower-case-type-label":\n"
+       "mov rdi, 16\n"
+       "call malloc\n"
+       "mov rbx, qword 0\n"
+       "MAKE_LITERAL_CLOSURE rax, rbx, "lower-case-type-label"_body\n"
+       "mov ["(symbol->string tag)"], rax\n"
+       "jmp "lower-case-type-label"_exit\n"
+       
+       
+       lower-case-type-label"_body:\n"
+       "push rbp\n"
+       "mov rbp, rsp\n"
+       "mov rbx, arg_count\n"
+       "cmp rbx, 1\n"
+       "jne "lower-case-type-label"_exit\n"
+       "mov r10, An(0)\n"
+       "mov r10, [r10]\n"
+       "TYPE r10\n"
+       "cmp r10, T_"type-label"\n"
+       "jne "lower-case-type-label"_not\n"
+       "mov rax, const_3\n" 
+       "jmp "lower-case-type-label"_finish\n"
+       lower-case-type-label"_not:\n"
+       "mov rax, const_4\n"
+       lower-case-type-label"_finish:\n"
+       "leave\n"
+       "ret\n"
+       
+       lower-case-type-label"_exit:\n"))))
+
+(define make-pred-label
+  (lambda (index)
+    (string-append fvar-label (number->string index))))
 
 (define cg-null?
-  (cg-type-check null-pred-label "T_NIL"))
+  (cg-type-check (make-pred-label 0) "T_NIL"))
 
 (define bool-pred-label "L_bool_check")
 
 (define cg-bool?
-  (cg-type-check bool-pred-label "T_BOOL"))
+  (cg-type-check(make-pred-label 1) "T_BOOL"))
 
 (define char-pred-label "L_char_check")
 
 (define cg-char?
-  (cg-type-check char-pred-label "T_CHAR"))
+  (cg-type-check (make-pred-label 2) "T_CHAR"))
 
 (define integer-pred-label "L_integer_check")
 
 (define cg-integer?
-  (cg-type-check integer-pred-label "T_INTEGER"))
+  (cg-type-check (make-pred-label 3) "T_INTEGER"))
 
 (define number-pred-label "L_number_check")
 
 (define cg-number?
-  (cg-type-check number-pred-label "T_INTEGER" "T_FRACTION"))
+  (cg-type-check (make-pred-label 4) "T_INTEGER" "T_FRACTION"))
 
 (define rational-pred-label "L_rational_check")
 
 (define cg-rational?
-  (cg-type-check rational-pred-label "T_INTEGER" "T_FRACTION"))
+  (cg-type-check (make-pred-label 5) "T_INTEGER" "T_FRACTION"))
 
 (define pair-pred-label "L_pair_check")
 
 (define cg-pair?
-  (cg-type-check pair-pred-label "T_PAIR"))
+  (cg-type-check (make-pred-label 6) "T_PAIR"))
 
 (define string-pred-label "L_string_check")
 
 (define cg-string?
-  (cg-type-check string-pred-label "T_STRING"))
+  (cg-type-check (make-pred-label 7) "T_STRING"))
 
 (define symbol-pred-label "L_symbol_check")
 
 (define cg-symbol?
-  (cg-type-check symbol-pred-label "T_SYMBOL"))
+  (cg-type-check (make-pred-label 8) "T_SYMBOL"))
 
 (define vector-pred-label "L_vector_check")
 
 (define cg-vector?
-  (cg-type-check vector-pred-label "T_VECTOR"))
+  (cg-type-check (make-pred-label 9) "T_VECTOR"))
 
 (define closure-pred-label "L_closure_check")
 
 (define cg-closure?
-  (cg-type-check closure-pred-label "T_CLOSURE"))
+  (cg-type-check (make-pred-label 10) "T_CLOSURE"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pair Operations ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
