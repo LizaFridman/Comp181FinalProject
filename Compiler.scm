@@ -1,6 +1,6 @@
-(load "sexpr-parser.scm")
-(load "tag-parser.scm")
-(load "semantic-analyzer.scm")
+(load "project/sexpr-parser.scm")
+(load "project/tag-parser.scm")
+(load "project/semantic-analyzer.scm")
 
 (define first
   (lambda (lst)
@@ -87,16 +87,16 @@
 (define compile-scheme-file
   (lambda (source dest)
     (let* ((exprs (file->list source))
-	   (built-in (file->list "Built-in.scm"))
+	   (built-in (file->list "project/Built-in.scm"))
 	   (pipelined (pipeline (append built-in exprs)))
 	   (size (length pipelined)))
-      (display (format "Pipelined = ~a\n" pipelined))
+      ;;(display (format "Pipelined = ~a\n" pipelined))
       ;;(display (format "Before c-table...\n"))
       (set! c-table (master-build-c-table pipelined 6))
       ;;(display (format "C-Table:\n~a\n" c-table))
       ;;(display (format "Before F-Table...\n"))
       (set! f-table (master-build-f-table pipelined))
-      (display (format "F-Table:\n~a\n" f-table))
+      ;;(display (format "F-Table:\n~a\n" f-table))
       (let* ((pre (generate-pre-text c-table f-table))
 	     (code (create-code-to-run pipelined)))
 	;;(display (format "Pre-Text:\n~a\nCode:\n~b\n" pre code))
@@ -655,14 +655,14 @@
 		)))
 
 (define master-symbol-builder
-	(lambda (table) ;c-table
-			(let* ((firstPart (symb-table-make (get-symbols table)))
-				   (secondPart (make-linked-symb-list)))			
-				(string-append
-				firstPart
-				secondPart
-				"mov [SymbolTable], eax \n"
-				))))
+  (lambda (table) ;c-table
+    (let* ((firstPart (symb-table-make (get-symbols table)))
+	   (secondPart (make-linked-symb-list)))			
+      (string-append
+       firstPart
+       secondPart
+       "mov [SymbolTable], eax \n"
+       ))))
 
 
 
@@ -1317,7 +1317,7 @@
 (define generate-pre-text
   (lambda (ct ft)
     ;;(display (format "Generating Prolog\n"))
-    (string-append "%include \"scheme.s\"" newLine
+    (string-append "%include \"project/scheme.s\"" newLine
 		   param-get-def
 		   newLine
 		   "section .bss" newLine
@@ -1344,6 +1344,11 @@
 		   "section .text" newLine
 		   newLine
 		   "main:" newLine
+		   tab "PUSH 0" newLine
+		   tab "PUSH 0" newLine
+		   tab "PUSH L_exit" newLine
+		   tab "push rbp" newLine
+		   tab "mov rbp, rsp" newLine
 		   (master-symbol-builder ct)
 		   "mov [SymbolTable], rax \n"
 		   newLine
@@ -1384,6 +1389,7 @@
   ;;(display (format "Generating Epilogue\n"))
   (string-append
    l-exit ":" newLine
+   tab "leave" newLine
    tab "MOV rax, 60" newLine
    tab "MOV rdi, 0" newLine
    tab "syscall" newLine))

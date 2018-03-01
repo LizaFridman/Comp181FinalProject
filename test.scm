@@ -1,3 +1,4 @@
 ;;; file 01
 
-(vector 1 4 5)
+(define x (cons 1 2))
+(car x)
