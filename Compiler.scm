@@ -1,6 +1,6 @@
-(load "project/sexpr-parser.scm")
-(load "project/tag-parser.scm")
-(load "project/semantic-analyzer.scm")
+(load "sexpr-parser.scm")
+(load "tag-parser.scm")
+(load "semantic-analyzer.scm")
 
 (define first
   (lambda (lst)
@@ -87,7 +87,7 @@
 (define compile-scheme-file
   (lambda (source dest)
     (let* ((exprs (file->list source))
-	   (built-in (file->list "project/Built-in.scm"))
+	   (built-in (file->list "Built-in.scm"))
 	   (pipelined (pipeline (append built-in exprs)))
 	   (size (length pipelined)))
       ;;(display (format "Pipelined = ~a\n" pipelined))
@@ -660,9 +660,6 @@
 ;				(second (make-linked-symb-list)))			
 			;)))
 
-;(define fetch-symbol
-;	(lambda (x)
-;		))
 
 
 
@@ -1318,7 +1315,7 @@
 (define generate-pre-text
   (lambda (ct ft)
     ;;(display (format "Generating Prolog\n"))
-    (string-append "%include \"project/scheme.s\"" newLine
+    (string-append "%include \"scheme.s\"" newLine
 		   param-get-def
 		   newLine
 		   "section .bss" newLine
@@ -1385,6 +1382,169 @@
    tab "syscall" newLine))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Built-in ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(define cg-cons
+    (lambda()
+        (string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, cons_body\n"
+            "mov [cons], rax\n"
+            "jmp cons_exit\n"
+            "L_cons:\n"
+            "push rbp\n"
+			"mov rbp, rsp\n"
+			"mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne cons_finish\n"
+            "mov rdi, 8\n"
+            "call malloc\n"
+            "mov rcx, An(0)\n"
+            "mov rdx, An(1)\n"
+            "MAKE_MALLOC_LITERAL_PAIR rax, rcx, rdx\n"
+            "cons_finish:\n"
+        	"leave\n"
+            "ret\n"
+            "cons_exit:\n")))
+(define cg-car
+    (lambda()
+        (string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, car_body\n"
+            "mov [car], rax\n"
+            "jmp car_exit\n"
+            "L_car:\n"
+            "push rbp\n"
+			"mov rbp, rsp\n"       
+            "mov rax, An(0)\n"
+            "mov rax, [rax]\n"
+            "DATA_UPPER rax\n"
+			"add rax, start_of_data\n"
+            "leave\n"
+            "ret\n"
+            "car_exit:\n")))
+
+(define cg-cdr
+    (lambda()
+        (string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, cdr_body\n"
+            "mov [cdr], rax\n"
+            "jmp cdr_exit\n"
+            "L_cdr:\n"
+            "push rbp\n"
+			"mov rbp, rsp\n"       
+            "mov rax, An(0)\n"
+            "mov rax, [rax]\n"
+            "DATA_LOWER rax\n"
+			"add rax, start_of_data\n"
+            "leave\n"
+            "ret\n"
+            "cdr_exit:\n")))
+
+(define cg-symbol->string
+	(lambda ()
+		(string-append
+			"mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, symbol_to_string_body\n"
+            "mov [symbol_to_string], rax\n"
+            "jmp symbol_to_string_exit\n"
+            
+            "L_symbol_string:\n"
+    		"push rbp\n"
+            "mov rbp, rsp\n"
+            "mov rax, An(0)\n"
+            "mov rax, [rax]\n"
+            "DATA rax\n"
+			"add rax , start_of_data\n"
+	        "symbol_to_string_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "symbol_to_string_exit:\n" )))
+
+(define cg-string->symbol
+	(lambda ()
+		(string-append
+			"mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, string_to_symbol_body\n"
+            "mov qword [string_to_symbol], rax\n"
+            "jmp string_to_symbol_exit\n"
+            
+            "L_string_symbol:\n"
+			"push rbp\n"
+			"mov rbp, rsp\n"
+			"mov r11, An(0)\n" ;r11= pointer to arg
+			;"mov r11, [r11]\n"
+		    "mov r10, [symbol_table]\n" ;content of fymbol_table, either a pair or const_2
+		    ;"mov r10, [r10]\n"				
+	        "cmp r10, const_2\n" 
+	        "je string_to_symbol_create_symbol\n"
+    		
+	        "string_to_symbol_loop:\n"
+			"mov r12, r10\n"
+			"mov r12, [r12]\n"
+			"DATA_UPPER r12\n"
+			"add r12 , start_of_data\n"
+			"mov r12, [r12]\n"
+			"DATA r12\n"
+			"add r12 , start_of_data\n"
+      		;"cmp r12, r11\n"  
+      		"STRING_COMPARE r12, r11\n"
+      		"cmp rax, const_3\n" 
+	        "je string_to_symbol_found\n"
+		    ;"CDR r10\n"
+		    "mov r10, [r10]\n"
+		    "DATA_LOWER r10\n"
+			"add r10, start_of_data\n"
+			"cmp r10, const_2\n"
+      		"je string_to_symbol_create_symbol\n"
+	        "jmp string_to_symbol_loop\n"
+	            
+	        "string_to_symbol_found:\n"
+	        "mov r10, [r10]\n"
+	        "DATA_UPPER r10\n"
+			"add r10, start_of_data\n"
+		   	"mov rax, r10\n"
+	        "jmp string_to_symbol_finish\n"
+	      
+	        "string_to_symbol_create_symbol:\n"
+	        "push r11\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "pop r11\n"
+	        "MAKE_MALLOC_LITERAL_SYMBOL rax , r11\n"
+			"mov r11, rax\n"
+      		"mov r13, r11\n"                    ;backup
+      		"mov r14, [symbol_table]\n"       
+      
+      		"push r11\n"
+      		"push r14\n"
+       		"mov rdi, 8\n"
+       		"call malloc\n"
+       		"pop r14\n"
+       		"pop r11\n"
+       		"MAKE_MALLOC_LITERAL_PAIR rax, r11 ,r14\n"
+      		"mov [symbol_table],rax\n"
+      		"mov rax, r13\n"
+
+	        "string_to_symbol_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "string_to_symbol_exit:\n"      
+	)))
+
+
+
 
 (define built-in-map
   ;; <func-name, func-label>
@@ -1461,7 +1621,17 @@
      cg-vector?
      newLine
      cg-closure?
-     newLine)))
+     newLine
+     cg-cons
+     newLine
+     cg-car 
+     newLine
+     cg-cdr
+     newLine
+     cg-symbol->string
+     newLine
+     cg-string->symbol
+     )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Type Checks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
