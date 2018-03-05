@@ -1322,7 +1322,7 @@
 		   newLine
 		   "section .bss" newLine
 		   "global main" newLine
-		   "extern malloc" newLine
+		   "extern malloc, exit" newLine
 		   newLine
 		   "section .data" newLine
 		   "start_of_data:" newLine
@@ -1390,10 +1390,13 @@
   (string-append
    l-exit ":" newLine
    tab "leave" newLine
-   tab "MOV rax, 60" newLine
-   tab "MOV rdi, 0" newLine
-   tab "syscall" newLine))
-
+   tab "MOV rax, 0" newLine
+   tab "call exit" newLine))
+   ;; tab "ret" newLine))
+   ;; tab "MOV rax, 60" newLine
+   ;; tab "MOV rdi, 0" newLine
+   ;; tab "syscall" newLine))
+   
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Built-in ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -1772,8 +1775,6 @@
   (lambda()
     (string-append "")))
 
-;((0 null?) (1 boolean?) (2 char?) (3 integer?) (4 number?) (5 rational?) (6 pair?) (7 string?) (8 symbol?) (9 vector?) (10 procedure?) (11 apply) (12 b<) (13 b=) (14 b+) (15 b/) (16 b*) (17 b-) (18 car) (19 cdr) (20 char->integer) (21 cons) (22 denominator) (23 eq?) (24 integer->char) (25 make-string) (26 make-vector) (27 numerator) (28 remainder) (29 string-length) (30 string-ref) (31 string-set!) (32 string->symbol) (33 symbol->string) (34 vector) (35 vector-length) (36 vector-ref) (37 vector-set!) (38 not) (39 list) (40 x))
-
 
 (define built-in-map
   ;; <func-name, func-label>
@@ -2037,3 +2038,4 @@
      tab "MOV rbx, " fvar-label (number->string index) newLine
      tab "MOV [rbx], rax" newLine
      newLine)))
+
