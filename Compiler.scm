@@ -859,6 +859,10 @@
   (lambda ()
     (string-append const-label (number->string (c-table-contains? c-table #f)))))
 
+(define sobTrue
+  (lambda ()
+    (string-append const-label (number->string (c-table-contains? c-table #t)))))
+
 (define sobVoid (string-append const-label "0"))
 
 (define cg-if3
@@ -1818,7 +1822,8 @@
     (vector "L_global34")
     (vector-length "L_global35")
     (vector-ref "L_global36")
-    (vector-set! "L_global37")))
+    (vector-set! "L_global37")
+    (zero? "L_global38")))
 
 (define built-in-funcs
   (map first built-in-map))
@@ -1901,6 +1906,9 @@
      (cg-vector-length)
      newLine
      (cg-vector-set)
+     newLine
+     (cg-zero?)
+     newLine
      )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Type Checks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -2000,6 +2008,47 @@
 
 (define cg-closure?
   (cg-type-check (make-pred-label 10) "T_CLOSURE"))
+
+(define cg-zero?
+    (lambda()
+        (string-append
+	 tab "mov rdi, 16" newLine
+	 tab "call malloc\n"
+	 tab "mov rbx, qword 0\n"
+	 tab "MAKE_LITERAL_CLOSURE rax, rbx, zero?_body\n"
+	 tab "mov [L_global38], rax\n"
+	 tab "jmp zero?_exit\n"
+	 newLine
+	 tab "zero?_body:\n"
+	 tab "push rbp\n"
+	 tab "mov rbp, rsp\n"         
+	 tab "mov rbx, arg_count\n"
+	 tab "cmp rbx, 1\n" 
+	 tab "jne zero?_finish\n"
+	 newLine
+	 tab "mov rax, An(0)\n"
+	 tab "mov rax, [rax]\n"
+	 tab "TYPE rax\n"
+	 tab "cmp rax, T_INTEGER\n"
+	 tab "je zero?_check\n"
+	 tab "cmp rax, T_FRACTION\n"
+	 tab "jne zero?_finish\n"
+	 newLine
+	 tab "zero?_check:\n"
+	 tab "mov rax, An(0)\n"
+	 tab "mov rax, [rax]\n"
+	 tab "DATA rax\n"
+	 tab "cmp rax, 0\n"
+	 tab "je zero?_true\n"
+	 tab "mov rax, " (sobFalse) newLine
+	 tab "jmp zero?_finish\n"
+	 tab "zero?_true:\n"
+	 tab "mov rax, " (sobTrue) newLine
+
+	 tab "zero?_finish:\n"
+	 tab "leave\n"
+	 tab "ret\n"
+	 tab "zero?_exit:\n" )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pair Operations ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

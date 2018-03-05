@@ -28,18 +28,18 @@
 (define list
   (lambda args args))
 
-(define fold_left
-  (lambda (proc init lst)
-    (if (null? lst) 
-	init 
-	(fold_left proc (proc init (car lst)) (cdr lst)))))
+;;(define fold_left
+  ;;(lambda (proc init lst)
+    ;;(if (null? lst) 
+  ;;	init 
+  ;;	(fold_left proc (proc init (car lst)) (cdr lst)))))
 
-(define +
-  (lambda x
-    (fold_left (lambda (acc y)
-		 (b+ acc y))
-	       0
-	       x)))
+;;(define +
+  ;;(lambda x
+    ;;(fold_left (lambda (acc y)
+		 ;;(b+ acc y))
+	     ;;  0
+	      ;; x)))
 
 ;;(define zero?
   ;;(lambda (element)
