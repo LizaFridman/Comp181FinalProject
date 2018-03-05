@@ -698,7 +698,7 @@ write_sob_string:
 section .data
 	
 .double_quote:
-	db '\"', 0
+	db '"', 0
 .fs_simple_char:
 	db "%c", 0
 .fs_hex_char:
