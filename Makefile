@@ -1,4 +1,4 @@
-loadVar:= (load "project/Compiler.scm") (load "project/sexpr-parser.scm")
+loadVar:= (load "project/Compiler.scm")
 
 loadVarInternal:= (load "Compiler.scm")
 
