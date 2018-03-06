@@ -104,12 +104,7 @@
 	%%LstrEnd:
 %endmacro
 
-%macro MAKE_LITERAL_SYMBOL 1+
-	dq ((((((%%LstrEnd - %%Lstr) >> 3) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (%%Lstr - start_of_data)) << TYPE_BITS) | T_SYMBOL)
-	%%Lstr:
-	dq %1
-	%%LstrEnd:		
-%endmacro
+%define MAKE_LITERAL_SYMBOL(address) (( address - start_of_data)  <<  TYPE_BITS | T_SYMBOL)
 	
 	
 %macro STRING_LENGTH 1
@@ -963,84 +958,74 @@ section .text
 write_sob_symbol:
 	push rbp
 	mov rbp, rsp
-
-	mov rax, qword [rbp + 8 + 1*8]
-
+	
+    mov rax, qword [rbp + 8 + 1*8]
+	DATA rax
+	add rax, start_of_data
+	mov rax, qword[rax]
 	mov rcx, rax
 	STRING_LENGTH rcx
-	
-	cmp rcx, 0
-	je .done
-	
 	STRING_ELEMENTS rax
 
-	push rcx
+.loop:
+	cmp rcx, 0
+	je .done
+	mov bl, byte [rax]
+	and rbx, 0xff
+
+	cmp rbx, CHAR_TAB
+	je .ch_tab
+	cmp rbx, CHAR_NEWLINE
+	je .ch_newline
+	cmp rbx, CHAR_PAGE
+	je .ch_page
+	cmp rbx, CHAR_RETURN
+	je .ch_return
+	cmp rbx, CHAR_SPACE
+	jl .ch_hex
+	
+	mov rdi, .fs_simple_char
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_hex:
+	mov rdi, .fs_hex_char
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_tab:
+	mov rdi, .fs_tab
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_page:
+	mov rdi, .fs_page
+	mov rsi, rbx
+	jmp .printf
+	
+.ch_return:
+	mov rdi, .fs_return
+	mov rsi, rbx
+	jmp .printf
+
+.ch_newline:
+	mov rdi, .fs_newline
+	mov rsi, rbx
+
+.printf:
 	push rax
-	mov rax, qword [rax]
-	push qword [rax]
-	call write_sob_string_wo_quotes
-	add rsp, 1*8
-	pop rax
+	push rcx
+	mov rax, 0
+	call printf
 	pop rcx
+	pop rax
 
-;; .loop:
-	
-;; 	mov bl, byte [rax]
-;; 	and rbx, 0xff
-
-;; 	cmp rbx, CHAR_TAB
-;; 	je .ch_tab
-;; 	cmp rbx, CHAR_NEWLINE
-;; 	je .ch_newline
-;;   cmp rbx, CHAR_PAGE
-;; 	je .ch_page
-;; 	cmp rbx, CHAR_RETURN
-;; 	je .ch_return
-;; 	cmp rbx, CHAR_SPACE
-;; 	jl .ch_hex
-	
-;; 	mov rdi, .fs_simple_char
-;; 	mov rsi, rbx
-;; 	jmp .printf
-
-;; .ch_hex:
-;; 	mov rdi, .fs_hex_char
-;; 	mov rsi, rbx
-;; 	jmp .printf
-	
-;; .ch_tab:
-;; 	mov rdi, .fs_tab
-;; 	mov rsi, rbx
-;; 	jmp .printf
-	
-;; .ch_page:
-;; 	mov rdi, .fs_page
-;; 	mov rsi, rbx
-;; 	jmp .printf
-	
-;; .ch_return:
-;; 	mov rdi, .fs_return
-;; 	mov rsi, rbx
-;; 	jmp .printf
-
-;; .ch_newline:
-;; 	mov rdi, .fs_newline
-;; 	mov rsi, rbx
-
-;; .printf:
-;; 	push rax
-;; 	push rcx
-;; 	mov rax, 0
-;; 	call printf
-;; 	pop rcx
-;; 	pop rax
-	
-;; .printfEnd:
-;; 	dec rcx
-;; 	inc rax
-;; jmp .loop
+	dec rcx
+	inc rax
+	jmp .loop
 
 .done:
+	
 	leave
 	ret
 
