@@ -52,7 +52,8 @@
 ;; MAKE_LITERAL_FRACTION_WITH_REGS target-address, num-address, den-address
 %macro MAKE_LITERAL_FRACTION_WITH_REGS 3
 	push rax 
-	push rbx 
+	push rbx
+	push rdi 
 	mov rax, %1 
 	mov qword [rax], %2
 	sub qword [rax], start_of_data
@@ -62,6 +63,7 @@
 	or qword [rax], rbx 
 	shl qword [rax], TYPE_BITS 
 	or qword [rax], T_FRACTION 
+	pop rdi
 	pop rbx 
 	pop rax 
 %endmacro
@@ -70,6 +72,7 @@
 %macro MAKE_MALLOC_LITERAL_PAIR 3
 	push rax 
 	push rbx 
+	push rdi
 	mov rax, %1 
 	mov qword [rax], %2
 	sub qword [rax], start_of_data
@@ -79,6 +82,7 @@
 	or qword [rax], rbx 
 	shl qword [rax], TYPE_BITS 
 	or qword [rax], T_PAIR 
+	pop rdi
 	pop rbx 
 	pop rax 
 %endmacro
@@ -93,33 +97,6 @@
 	DATA_LOWER %1
 	add %1, start_of_data
 	mov %1, qword [%1]
-%endmacro
-
-%macro MULT 2
-	mov rax, %1
-	mul %2
-	mov %1, rax
-%endmacro
-
-%macro REMAINDER 2
-	mov rax, %1
-	div %2
-	mov %1, rdx
-%endmacro
-
-;string_target = string label of symbol
-%define MAKE_LITERAL_SYMBOL(string_target) (((string_target - start_of_data) << TYPE_BITS ) | T_SYMBOL)
-
-
-;;; MAKE_MALLOC_LITERAL_SYMBOL target-address, str-address
-%macro MAKE_MALLOC_LITERAL_SYMBOL 2
-	push rax 
-	mov rax, %1 
-	mov qword [rax], %2
-	sub qword [rax], start_of_data
-	shl qword [rax], TYPE_BITS 
-	or qword [rax], T_SYMBOL
-	pop rax 
 %endmacro
 
 ;;; MAKE_LITERAL_CLOSURE target, env, code
@@ -165,6 +142,88 @@
 %macro STRING_ELEMENTS 1
 	DATA_LOWER %1
 	add %1, start_of_data
+%endmacro
+
+;;; STRING_REF dest, src, index
+;;; dest cannot be RAX! (fix this!)
+%macro STRING_REF 3
+	push rax
+	mov rax, %2
+	STRING_ELEMENTS rax
+	add rax, %3
+	mov %1, byte [rax]
+	pop rax
+%endmacro
+
+%macro MAKE_LITERAL_STRING 0
+	dq MAKE_LITERAL(T_STRING,0)
+%endmacro
+
+%macro MAKE_LITERAL_VECTOR 0
+	dq MAKE_LITERAL(T_VECTOR,0)
+%endmacro
+
+%macro MAKE_LITERAL_VECTOR 1+
+	dq ((((((%%VecEnd - %%Vec) >> 3) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (%%Vec - start_of_data)) << TYPE_BITS) | T_VECTOR)
+	%%Vec:
+	dq %1
+	%%VecEnd:
+%endmacro
+
+%macro VECTOR_LENGTH 1
+	DATA_UPPER %1
+%endmacro
+
+%macro VECTOR_ELEMENTS 1
+	DATA_LOWER %1
+	add %1, start_of_data
+%endmacro
+
+;;; VECTOR_REF dest, src, index
+;;; dest cannot be RAX! (fix this!)
+%macro VECTOR_REF 3
+	mov %1, %2
+	VECTOR_ELEMENTS %1
+	lea %1, [%1 + %3*8]
+	mov %1, qword [%1]
+	mov %1, qword [%1]
+%endmacro
+
+%macro MULT 2
+  push rdi
+	mov rax, %1
+	mul %2
+	mov %1, rax
+	pop rdi
+%endmacro
+
+%macro REMAINDER 2
+  push rdi
+	mov rax, %1
+	div %2
+	mov %1, rdx
+	pop rdi
+%endmacro
+
+%macro IABS 1
+	cmp %1, 0
+	jge %%cont
+	neg %1
+	%%cont:
+%endmacro
+
+%define MAKE_LITERAL_SYMBOL(string_target) (((string_target - start_of_data) << TYPE_BITS ) | T_SYMBOL)
+
+
+;;; MAKE_MALLOC_LITERAL_SYMBOL target-address, str-address
+%macro MAKE_MALLOC_LITERAL_SYMBOL 2
+	push rax 
+	mov rax, %1 
+	mov qword [rax], %2
+	sub qword [rax], start_of_data
+	shl qword [rax], TYPE_BITS 
+	or qword [rax], T_SYMBOL
+	pop rax 
 %endmacro
 
 %macro STRING_COMPARE 2
@@ -213,17 +272,6 @@
 	pop rbx
 %endmacro
 
-;;; STRING_REF dest, src, index
-;;; dest cannot be RAX! (fix this!)
-%macro STRING_REF 3
-	push rax
-	mov rax, %2
-	STRING_ELEMENTS rax
-	add rax, %3
-	mov %1, byte [rax]
-	pop rax
-%endmacro
-
 %macro MAKE_LITERAL_STRING_WITH_REGS 2
 	shl %2, 30
 	mov rax, %2
@@ -233,41 +281,8 @@
 	or rax, T_STRING
 %endmacro
 
-%macro MAKE_LITERAL_STRING 0
-	dq MAKE_LITERAL(T_STRING,0)
-%endmacro
-
-%macro MAKE_LITERAL_VECTOR 0
-	dq MAKE_LITERAL(T_VECTOR,0)
-%endmacro
-
-%macro MAKE_LITERAL_VECTOR 1+
-	dq ((((((%%VecEnd - %%Vec) >> 3) << ((WORD_SIZE - TYPE_BITS) >> 1)) | (%%Vec - start_of_data)) << TYPE_BITS) | T_VECTOR)
-	%%Vec:
-	dq %1
-	%%VecEnd:
-%endmacro
-
-%macro VECTOR_LENGTH 1
-	DATA_UPPER %1
-%endmacro
-
-%macro VECTOR_ELEMENTS 1
-	DATA_LOWER %1
-	add %1, start_of_data
-%endmacro
-
-;;; VECTOR_REF dest, src, index
-;;; dest cannot be RAX! (fix this!)
-%macro VECTOR_REF 3
-	mov %1, %2
-	VECTOR_ELEMENTS %1
-	lea %1, [%1 + %3*8]
-	mov %1, qword [%1]
-	mov %1, qword [%1]
-%endmacro
-
 %macro MAKE_LITERAL_VECTOR_WITH_REGS 2
+  push rdi
 	shr %2, 3
 	shl %2, 30
 	mov rax, %2
@@ -275,13 +290,7 @@
 	sub rax, start_of_data
 	shl rax, TYPE_BITS
 	or rax, T_VECTOR
-%endmacro
-
-%macro IABS 1
-	cmp %1, 0
-	jge %%cont
-	neg %1
-	%%cont:
+	pop rdi
 %endmacro
 
 %define SOB_UNDEFINED MAKE_LITERAL(T_UNDEFINED, 0)
@@ -325,32 +334,6 @@ extern exit, printf, scanf, malloc
 global main, write_sob, write_sob_if_not_void
 section .text
 
-;push arguments before calling this func. rax=result
-; gcd:
-;   	push rbp
-;   	mov rbp, rsp
-;   	mov r11, r8
-;   	mov r12, r9
-  
-;   .gcd_loop:
-; 	mov r10, r11
-; 	;REMAINDER r10 r9 ;n%m
-; 	mov rax, r10
-; 	mov rdx, qword 0
-; 	idiv r12
-; 	mov r10, rdx
-; 	cmp r10, 0
-; 	je .gcd_exit 
-; 	mov r11, r12 ; n:=m
-; 	mov r12, r10 ; m:=n%m
-; 	jmp .gcd_loop
-;   .gcd_exit:
-; 	mov rax, r12
-; 	;push rax
-; 	;push r8
-; 	;push r9
-; 	leave
-; 	ret
 gcd:
 	push rbp
 	mov rbp, rsp
@@ -358,8 +341,6 @@ gcd:
   	mov r12, r9
 
 	mov rdx, qword 0
-	;mov rax, [rbp + 4 + 1*4] ; first
-	;mov rbx, [rbp + 4 + 2*4] ; second
 	IABS r11
 	IABS r12
 	cmp r11, r12

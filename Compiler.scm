@@ -2,80 +2,42 @@
 (load "project/tag-parser.scm")
 (load "project/semantic-analyzer.scm")
 
-(define pipeline
-	(lambda (s)
-		((star <sexpr>) s 
-			(lambda (m r)
-				(map (lambda (e)
-						(annotate-tc
-							(pe->lex-pe
-								(box-set
-									(remove-applic-lambda-nil
-										(parse e))))))
-					  m))
-	   		(lambda (f) 'fail))))
-
-(define file->list
-	(lambda (input-file)
-		(let ((in-port (open-input-file input-file)))
-			(letrec ((run (lambda ()
-							(let ((ch (read-char in-port)))
-								(if (eof-object? ch)
-									(begin (close-input-port in-port) '())
-									(cons ch (run)))))))
-				(run)))))
-
-(define string->file
-	(lambda (out-file str)
-		(if (file-exists? out-file) (delete-file out-file))
-		(let ((out-port (open-output-file out-file)))
-			(letrec ((run
-				(lambda (lst)
-					(if (null? lst) (close-output-port out-port)
-								(begin
-									(write-char (car lst) out-port)
-									(run (cdr lst)))))))
-				(run (string->list str))))))
-
-(define generate-label
+(define to-string
+	(lambda (exp)
+		(cond ((number? exp) (number->string exp))
+              ((symbol? exp) (symbol->string exp))
+              (else exp))))
+;labels:
+(define env_level -1)
+(define label-start-index 1)
+(define update-label
+    (lambda (label_name)
+        (let ((curr-index label-start-index))
+            (set! label-start-index (+ label-start-index 1))
+            (string-append label_name (number->string curr-index)))))
+(define make_label
 	(lambda (label-prefix)
 		(lambda ()
 			(let ((index 0))
 				(lambda ()
 					(set! index (+ index 1))
 					(string-append label-prefix (number->string index)))))))
-
-(define exit_or_lbl ((generate-label "exit_or_")))
-(define exit_if3_lbl ((generate-label "exit_if3_")))
-(define else_if3_lbl ((generate-label "else_if3_")))
-(define exit_app_lbl ((generate-label "exit_app_")))
-(define skip_code_lbl ((generate-label "skip_code_")))
-(define for_copy_args_lbl ((generate-label "for_copy_args_")))
-(define end_of_copy_args_lbl ((generate-label "end_of_copy_args_")))
-(define for_copy_envs_lbl ((generate-label "for_copy_envs_")))
-(define end_of_copy_envs_lbl ((generate-label "end_of_copy_envs_")))
-(define code_lbl ((generate-label "code_label_")))
-(define new_env_lbl ((generate-label "new_env_")))
-(define for_fix_stack_lbl ((generate-label "for_fix_stack_")))
-(define end_of_fix_stack_lbl ((generate-label "end_of_fix_stack_")))
-(define debug_lbl ((generate-label "DEBUG_")))
-(define dont_push_lbl ((generate-label "dont_push_arg_")))
-(define fvar_lbl ((generate-label "fvar_")))
-
-(define to-string
-	(lambda (exp)
-		(cond ((number? exp) (number->string exp))
-              ((symbol? exp) (symbol->string exp))
-              (else exp))))
-
-(define remove-duplicates-from-list
-    (lambda (lst)
-        (fold-left (lambda (acc curr)
-                        (if (member curr acc)
-                            acc
-                            (append acc (list curr))))
-                    '()
-                    lst)))
+(define end_of_code ((make_label "code_end")))
+(define loop_to_copy_args ((make_label "copy_arg_loop")))
+(define end_of_if ((make_label "if_exit")))
+(define error? ((make_label "error?")))
+(define not_pushing ((make_label "don't_push_args")))
+(define global_var ((make_label "global_var")))
+(define loop_to_copy_envs ((make_label "copy_envs_loop")))
+(define else_of_if ((make_label "if_else_")))
+(define end_of_copy_args_lbl ((make_label "end_of_copy_args")))
+(define end_of_of_stack ((make_label "end_of_fix_stack_loop")))
+(define end_of_or ((make_label "or_exit")))
+(define end_of_applic ((make_label "applic_else")))
+(define end_of_copy_envs ((make_label "end_of_copy_envs")))
+(define code ((make_label "code_start")))
+(define new_env ((make_label "new_env")))
+(define loop_to_fix_stack ((make_label "fix_stack_loop")))
 
 (define str-list->delimited-str
 	(lambda (lst)
@@ -84,39 +46,48 @@
 			(fold-left (lambda (acc x) (string-append acc ", " x))
 						(car lst)
 						(cdr lst)))))
-
-(define is-empty-string
+(define remove-dups
+    (lambda (lst)
+        (fold-left (lambda (acc curr)
+                        (if (not (member curr acc))
+                       (append acc (list curr))
+                       acc
+                       ))
+                    (list)
+                    lst)))
+(define emptry_string?
 	(lambda (str)
-		(equal? str "")))
-
+		(= (string-length str) 0)))
 (define string->str-list 
 	(lambda (str)
 		(let* ((ans (fold-left (lambda (acc ch)
-								(let ((curr-str (car acc)) (ans-acc (cdr acc)))
-								(cond ((equal? ch #\nul) 
-										(if (is-empty-string curr-str)
-											(cons "" (append ans-acc (list "CHAR_NUL")))
-											(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_NUL")))))
-									  ((equal? ch #\tab)
-										(if (is-empty-string curr-str)
-											(cons "" (append ans-acc (list "CHAR_TAB")))
-											(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_TAB")))))
-									  ((equal? ch #\newline)
-										(if (is-empty-string curr-str)
-											(cons "" (append ans-acc (list "CHAR_NEWLINE")))
-											(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_NEWLINE")))))
-									  ((equal? ch #\return)
-									  	(if (is-empty-string curr-str)
-											(cons "" (append ans-acc (list "CHAR_RETURN")))
-											(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_RETURN")))))
+								(let ((this_str (car acc)) (so_far (cdr acc)))
+								(cond ((equal? ch #\nul) ;deal with special chars
+										((equal? ch #\newline)
+										(if (emptry_string? this_str)
+											(cons "" (append so_far (list "CHAR_NEWLINE")))
+											(cons "" (append so_far (list (string-append "\"" this_str "\"")) (list "CHAR_NEWLINE")))))
+										(if (emptry_string? this_str)
+											(cons "" (append so_far (list "CHAR_NUL")))
+											(cons "" (append so_far (list (string-append "\"" this_str "\"")) (list "CHAR_NUL")))))
 									  ((equal? ch #\space) 
-									  	(if (is-empty-string curr-str)
-											(cons "" (append ans-acc (list "CHAR_SPACE")))
-											(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_SPACE")))))
+									  	(if (emptry_string? this_str)
+											(cons "" (append so_far (list "CHAR_SPACE")))
+											(cons "" (append so_far (list (string-append "\"" this_str "\"")) (list "CHAR_SPACE")))))
+									  ((equal? ch #\tab)
+										(if (emptry_string? this_str)
+											(cons "" (append so_far (list "CHAR_TAB")))
+											(cons "" (append so_far (list (string-append "\"" this_str "\"")) (list "CHAR_TAB")))))
+									  
+									  ((equal? ch #\return)
+									  	(if (emptry_string? this_str)
+											(cons "" (append so_far (list "CHAR_RETURN")))
+											(cons "" (append so_far (list (string-append "\"" this_str "\"")) (list "CHAR_RETURN")))))
+									  
 									  (else 
-											(cons (string-append curr-str (list->string (list ch))) ans-acc)))))
+											(cons (string-append this_str (list->string (list ch))) so_far)))))
 
-							  	(cons "" '())
+							  	(list (string))
 							 	(string->list str))))
 			(if (equal? (car ans) "")
 				(cdr ans)
@@ -124,75 +95,56 @@
 		)
 	))
 
-(define lexical_env -1)
-
-;------------------------LABEL-----------------------------------
-
-(define label-start-index 1)
-
-(define update-label
-    (lambda (lbl-prefix)
-        (let ((curr-index label-start-index))
-            (set! label-start-index (+ label-start-index 1))
-            (string-append lbl-prefix (number->string curr-index)))))
-
-;------------------------CONST-TABLE------------------------------
-
-
-
-
 (define turn_to_ascii_strings
 	(lambda (str)
 		(map (lambda (x) (number->string (char->integer x))) (string->list str))))
 
 
-(define const-table `(,void () ,#t ,#f))
+(define c-table `(,void () ,#t ,#f))
 
-(define expand-const-table
+(define add_to_c-table ;takes pe and updates the c-table
     (lambda (pe)
         (cond 	((or (null? pe) (not (list? pe))) #f)
               	((equal? (car pe) 'const)
               		(let ((val (cadr pe)))
 	                	(cond  	((null? val) #f) 
+	                			((pair? val)
+	                       		 	(begin (add_to_c-table `(const ,(car val)))
+	                               		   (add_to_c-table `(const ,(cdr val)))
+	                               		   (set! c-table (append c-table (list val))))) 
 	                		   	((vector? val)
-	                        		(begin (vector-map (lambda (e) (expand-const-table `(const ,e))) val)
-	                            	   	   (set! const-table (append const-table (list val)))))
-	                      	   	((pair? val)
-	                       		 	(begin (expand-const-table `(const ,(car val)))
-	                               		   (expand-const-table `(const ,(cdr val)))
-	                               		   (set! const-table (append const-table (list val)))))              
+	                        		(begin (vector-map (lambda (e) (add_to_c-table `(const ,e))) val)
+	                            	   	   (set! c-table (append c-table (list val)))))
 	                      	   	((and (number? val) (not (integer? val)))
 	                                (let* ((original-num (numerator val))
 	                                	   (original-den (denominator val))
 	                                	   (gcd-val (gcd original-num original-den))
 	                                       (updated-num (/ original-num gcd-val))
 	                                       (updated-den (/ original-den gcd-val)))
-	                                    (begin (expand-const-table `(const ,updated-num))
-	                                           (expand-const-table `(const ,updated-den))
-	                                           (set! const-table (append const-table (list val))))))
+	                                       (begin (add_to_c-table `(const ,updated-num))
+	                                           (add_to_c-table `(const ,updated-den))
+	                                           (set! c-table (append c-table (list val))))))
 	                          	((symbol? val) 
-	                          		(begin 	(set! const-table (append const-table (list (symbol->string val))))
-		                                    (set! const-table (append const-table (list val))))) 
-		                      	(else (set! const-table (append const-table (list val)))))))
-                      
-              	(else (map expand-const-table pe)))))
+	                          		(begin 	(set! c-table (append c-table (list (symbol->string val))))
+		                                    (set! c-table (append c-table (list val))))) 
+		                      	(else (set! c-table (append c-table (list val)))))))
+              					(else (map add_to_c-table pe)))))
                    
-(define remove-duplicates-from-const-table
+(define remove-duplicates-from-c-table
     (lambda ()
-        (set! const-table (remove-duplicates-from-list const-table))))
+        (set! c-table (remove-dups c-table))))
 
-(define get-label-from-const-table
+(define get_c_label
     (lambda(constant tagged-table)
-        (let* ((curr-row (car tagged-table))
-        	   (curr-val (cadr curr-row))
-        	   (curr-label (car curr-row)))
-        	  (if (equal? constant curr-val)
-        	  		curr-label
-        	  	  (get-label-from-const-table constant (cdr tagged-table))))))
+        (let ((val (cadar tagged-table))
+        	   (var_label (caar tagged-table)))
+        	  (if (equal? constant val)
+        	  		var_label
+        	  	  (get_c_label constant (cdr tagged-table))))))
                     
-(define const-table-add-type-id
+(define add_ids_to_c_table
     (lambda()
-        (set! const-table 
+        (set! c-table 
         	(fold-left
                 (lambda (acc-table constant)
                 	(let ((const-lbl "const_"))
@@ -220,69 +172,64 @@
 				                            `(,(update-label const-lbl) ,constant T_SYMBOL))
 				                        ((pair? constant)
 				                            `(,(update-label const-lbl) ,constant T_PAIR))
-				                        (else (error 'constant "const table add type id error")))))))
-                '()
-                const-table))))
-
-(define create-const-table
-	(lambda (pe-lst)
-		(begin (expand-const-table pe-lst)
-			   (remove-duplicates-from-const-table)
-			   (const-table-add-type-id)
-		)
-    ))
-
+				                        (else (error 'constant "error in the const table construction"))))))) '() c-table))))
+(define create-c-table ; run this when compilation starts
+	(lambda (exprs)
+		(begin (add_to_c-table exprs)
+			   (remove-duplicates-from-c-table)
+			   (add_ids_to_c_table))))
 (define get-const-string
 	(lambda ()
 		(fold-left
             (lambda (acc el)
             	(let ((const-val (cadr el))
 					  (const-label (car el)))
-                    (cond 	((equal? const-val void)
-								(string-append acc (string-append const-label ":\n\t dq SOB_VOID\n")))
-				    	   	((equal? const-val '())
+                    (cond 	
+				    	   	((equal? const-val '()); null
 								(string-append acc (string-append const-label ":\n\t dq SOB_NIL\n")))
-							((equal? const-val #t)
+							((equal? const-val #t); bool-t
 								(string-append acc (string-append const-label ":\n\t dq SOB_TRUE\n")))
-							((equal? const-val #f)
+							((equal? const-val void)
+								(string-append acc (string-append const-label ":\n\t dq SOB_VOID\n")))
+							((equal? const-val #f); bool-f
 								(string-append acc (string-append const-label ":\n\t dq SOB_FALSE\n")))
-	                    	((number? const-val)
+	                    	((number? const-val);num
 	                        	(let* ((original-num (numerator const-val))
 	                        		   (original-den (denominator const-val))
 	                        		   (gcd-val (gcd original-num original-den))
 	                                   (updated-num (/ original-num gcd-val))
 	                                   (updated-den (/ original-den gcd-val)))
 	                            	(if (integer? const-val)
-	                            		(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL(T_INTEGER, "(number->string updated-num)")\n"))
-	                            		(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL_FRACTION("(get-label-from-const-table updated-num const-table) 
-	                            																				  	  ", "(get-label-from-const-table updated-den const-table)")\n")))))
-	                    	((char? const-val) 
+	                            		(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL(T_INTEGER, "(number->string updated-num)")\n"));add both
+	                            		(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL_FRACTION("(get_c_label updated-num c-table) 
+	                            																				  	  ", "(get_c_label updated-den c-table)")\n")))))
+	                    	((char? const-val) ;char
 								(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL(T_CHAR, "(number->string (char->integer const-val))")\n")))
-	                        ((vector? const-val)
-	                            (let ((label-lst (map (lambda (x) (get-label-from-const-table x const-table)) (vector->list const-val)))
+	                        ((vector? const-val);vector
+	                            (let ((label-lst (map (lambda (x) (get_c_label x c-table)) (vector->list const-val)))
 	                            	  (vector-len (vector-length const-val)))
                         			(string-append acc (string-append const-label ":\n\t MAKE_LITERAL_VECTOR " (str-list->delimited-str label-lst)"\n"))))
-	                        ((string? const-val)
+	                        ((string? const-val);string
                         		(string-append acc (string-append const-label ":\n\t MAKE_LITERAL_STRING " (str-list->delimited-str (turn_to_ascii_strings (car (string->str-list const-val))))"\n")))
-	                        ((symbol? const-val)
-                        		(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL_SYMBOL("(get-label-from-const-table (symbol->string const-val) const-table)")\n")))
-	                        ((pair? const-val)
-	                        	(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL_PAIR("(get-label-from-const-table (car const-val) const-table)
-	                            																	    ", "(get-label-from-const-table (cdr const-val) const-table)")\n")))
-	                        (else (error 'constant "const table add address and type id error")))))
+	                        ((pair? const-val);pair
+	                        	(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL_PAIR("(get_c_label (car const-val) c-table)
+	                            																	    ", "(get_c_label (cdr const-val) c-table)")\n")))
+	                        ((symbol? const-val);symbol
+                        		(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL_SYMBOL("(get_c_label (symbol->string const-val) c-table)")\n")))
+	                        
+	                        (else (error 'constant "error making c-table creation")))))
                 ""
-                const-table)))
-
-;------------------------GLOBAL-VAR-TABLE------------------------------
-
-(define init-global-var-table '((car "car") 
+                c-table)))
+;f-table
+(define string_for_f_table_initialization '((car "car") 
 							   (cdr "cdr")
 							   (cons "cons")
-							   (list "list")
-							   (null? "null?")
 							   (boolean? "boolean?")
 							   (pair? "pair?")
 							   (char? "char?")
+							   (list "list")
+							   (null? "null?")
+							   (apply "apply")
 							   (integer? "integer?")
 							   (procedure? "procedure?")
 							   (string? "string?")
@@ -295,27 +242,6 @@
 							   (number? "number?")
 							   (rational? "rational?") 
 							   (eq? "eq?")
-							   (char->integer "char_to_integer")
-							   (integer->char "integer_to_char")
-							   (numerator "numerator")
-							   (denominator "denominator")
-							   (string-length "string_length")
-							   (vector-length "vector_length")
-							   (string-ref "string_ref")
-							   (vector-ref "vector_ref")
-							   (remainder "remainder")
-							   (bin_equal "bin_equal")
-							   (bin_plus  "bin_plus")
-							   (bin_minus "bin_minus")
-							   (bin_mul   "bin_mul")
-							   (bin_div   "bin_div")
-							   (bin_less_than   "bin_less_than")
-							   (bin_greater_than   "bin_greater_than")
-							   (string-set! "string_set")
-							   (vector-set! "vector_set")
-							   (make-string "make_string")
-							   (make-vector "make_vector")
-							   (vector "custom_vector")
 							   (+ "plus")
 							   (- "minus")
 							   (/ "div")
@@ -323,23 +249,46 @@
 							   (< "less_than")
 							   (> "greater_than")
 							   (= "equal")
+							   (char->integer "char_to_integer")
+							   (integer->char "integer_to_char")
+							   (numerator "numerator")
+							   (string-ref "string_ref")
+							   (vector-ref "vector_ref")
+							   (remainder "remainder")
+							   (denominator "denominator")
+							   (string-length "string_length")
+							   (vector-length "vector_length")
+							   
+							    (string-set! "string_set")
+							   (vector-set! "vector_set")
+							   (bin_equal "bin_equal")
+							   (bin_plus  "bin_plus")
+							   (bin_minus "bin_minus")
+							   (bin_mul   "bin_mul")
+							   (bin_div   "bin_div")
+							   (bin_less_than   "bin_less_than")
+							   (bin_greater_than   "bin_greater_than")
+							  
+							   (make-string "make_string")
+							   (make-vector "make_vector")
+							   (vector "custom_vector")
+							   
 							   (map "map")
-							   (apply "apply")
+							   
 							   (symbol->string "symbol_to_string")
 							   (string->symbol "string_to_symbol")))
 
-(define global-var-table init-global-var-table)
-
-(define expand-global-var-table
+(define global-var-table string_for_f_table_initialization) ;this build the table into global-var-table
+(define add-to-global-var-table
     (lambda (pe)
         (cond ((or (not (list? pe)) (null? pe)) #f)
-              ((and (equal? (car pe) 'fvar) (not (assq (cadr pe) init-global-var-table)))
-                (set! global-var-table (append global-var-table (list (list (cadr pe) (fvar_lbl))))))
-              (else (map expand-global-var-table pe)))))
+              ((and (equal? (car pe) 'fvar) (not (assq (cadr pe) string_for_f_table_initialization)))
+                (set! global-var-table (append global-var-table (list (list (cadr pe) (global_var))))))
+              (else (map add-to-global-var-table pe)))))
 
 (define remove-duplicates-from-global-var-table
     (lambda ()
-        (set! global-var-table (remove-duplicates-from-list global-var-table))))
+        (set! global-var-table (remove-dups global-var-table))))
 
 (define get-label-from-global-var-table
     (lambda (val curr-var-table)
@@ -352,17 +301,16 @@
 
 (define create-global-var-table
 	(lambda (pe-lst)
-		(begin (expand-global-var-table pe-lst)
+		(begin (add-to-global-var-table pe-lst)
 			   (remove-duplicates-from-global-var-table)
-			   ;(global-var-table-add-address)
 			)))
 
 (define get-fvar-string
 	(lambda ()
 		(fold-left
-	        (lambda (acc el)
-	            	(string-append acc (cadr el) ":\n\tdq SOB_UNDEFINED\n"))
-	        ""
+	        (lambda (a b)
+	            	(string-append a (cadr b) ":\n\tdq SOB_UNDEFINED\n"))
+	        (string)
 	        global-var-table)))
 
 ;------------------------SYMBOL-TABLE------------------------------
@@ -375,110 +323,94 @@
     				(+ acc 1)
     				acc))
     		0
-    		const-table)))
+    		c-table)))
 
 
 
-(define gen-symbol-table 
-    (lambda (curr-const-table index number-of-symbols-left)
+(define cg-symbol-table 
+    (lambda (curr-c-table index number-of-symbols-left)
         (if (equal? number-of-symbols-left 0)
         	(if (equal? index 0)
                 (string-append "symbol_table:\n\t dq const_2\n") 
             	(string-append "symbol_table:\n\t dq symbol_0\n"))
-            (if (not (null? curr-const-table))
-            	(let* ((el (car curr-const-table)) 
+            (if (not (null? curr-c-table))
+            	(let* ((el (car curr-c-table)) 
     		  		  (const-label (car el)) 
     		  		  (const-val (cadr el)) 
     		  		  (const-type (caddr el)))
                 	(if (not (equal? const-type 'T_SYMBOL))
-                    	(gen-symbol-table (cdr curr-const-table) index number-of-symbols-left)
+                    	(cg-symbol-table (cdr curr-c-table) index number-of-symbols-left)
                     	(if (equal? number-of-symbols-left 1)
 							(string-append "symbol_"(number->string index)": 
-								\n\t dq MAKE_LITERAL_PAIR("const-label", const_2)\n" (gen-symbol-table (cdr curr-const-table) (+ index 1) (- number-of-symbols-left 1)))
+								\n\t dq MAKE_LITERAL_PAIR("const-label", const_2)\n" (cg-symbol-table (cdr curr-c-table) (+ index 1) (- number-of-symbols-left 1)))
 							(string-append "symbol_"(number->string index)": 
-								\n\t dq MAKE_LITERAL_PAIR("const-label", symbol_"(number->string (+ index 1))")\n"(gen-symbol-table (cdr curr-const-table) (+ index 1) (- number-of-symbols-left 1))))))
-            (gen-symbol-table (cdr const-table) index number-of-symbols-left)))))
-
-
-;------------------------CODE-GEN------------------------------
-
-(define code-gen
+								\n\t dq MAKE_LITERAL_PAIR("const-label", symbol_"(number->string (+ index 1))")\n"(cg-symbol-table (cdr curr-c-table) (+ index 1) (- number-of-symbols-left 1))))))
+            (cg-symbol-table (cdr c-table) index number-of-symbols-left)))))
+;cg-code
+(define code_gen
     (lambda (pe)
         (cond 
-            ((equal? (car pe) 'if3) (gen-if  pe))
-            ((equal? (car pe) 'seq) (gen-seq pe))
-            ((equal? (car pe) 'or)  (gen-or  pe))
-            ((equal? (car pe) 'applic)  (gen-app pe))
-           	((equal? (car pe) 'tc-applic)  (gen-app pe))
-           	((equal? (car pe) 'lambda-simple)  (gen-lambda-simple pe))
-            ((equal? (car pe) 'lambda-opt)  (gen-lambda-opt pe))
-            ((equal? (car pe) 'define) (gen-define pe))
-            ((equal? (car pe) 'const) (gen-const pe))
-            ((equal? (car pe) 'fvar)  (gen-fvar pe))
-            ((equal? (car pe) 'bvar) (gen-bvar pe))
-            ((equal? (car pe) 'pvar) (gen-pvar pe))
-            ((equal? (car pe) 'set) (gen-set pe))
-            ((equal? (car pe) 'box) (gen-box pe))
-            ((equal? (car pe) 'box-set) (gen-box-set pe))
-            ((equal? (car pe) 'box-get) (gen-box-get pe))
+            ((equal? (car pe) 'if3) (cg-if  pe))
+                        ((equal? (car pe) 'pvar) (cg-pvar pe))
+
+            ((equal? (car pe) 'box-set) (cg-box-set pe))
+            ((equal? (car pe) 'box-get) (cg-box-get pe))
+            ((equal? (car pe) 'seq) (cg-seq pe))
+            ((equal? (car pe) 'or)  (cg-or  pe))
+            ((equal? (car pe) 'set) (cg-set pe))
+            ((equal? (car pe) 'box) (cg-box pe))
+            ((equal? (car pe) 'applic)  (cg-app pe))
+           	((equal? (car pe) 'tc-applic)  (cg-app pe))
+           	((equal? (car pe) 'lambda-simple)  (cg-lambda-simple pe))
+            ((equal? (car pe) 'lambda-opt)  (cg-lambda-opt pe))
+            ((equal? (car pe) 'define) (cg-define pe))
+            ((equal? (car pe) 'const) (cg-const pe))
+            ((equal? (car pe) 'fvar)  (cg-fvar pe))
+            ((equal? (car pe) 'bvar) (cg-bvar pe))
+
             (else "mov rax, const_4\n")
         )))
 
-(define gen-const
-    (lambda(pe)
-        (string-append "mov rax, "(to-string (get-label-from-const-table (cadr pe) const-table))"\n")))
-
-(define gen-fvar
-	(lambda(pe)
-		(string-append "mov rax, ["(get-label-from-global-var-table (cadr pe) global-var-table)"]\n")))
-
-(define gen-define
+(define cg-define
     (lambda(pe)
     	(let ((var-name (cadadr pe)) (pe-val (caddr pe)) (void_lbl "const_1"))
 	        (string-append
-	            (code-gen pe-val)
+	            (code_gen pe-val)
 	            "mov [" (cadr (assq var-name global-var-table)) "], rax\n"
-	            "mov rax, "void_lbl"\n"
-	        ))))
-
-(define gen-or
-    (lambda (pe)
-        (let ((exit_lbl (exit_or_lbl)) (first_arg (caadr pe)) (rest_args (cdadr pe)))
+	            "mov rax, "void_lbl"\n"))))
+(define cg-const
+    (lambda(pe)
+        (string-append "mov rax, "(to-string (get_c_label (cadr pe) c-table))"\n")))
+(define cg-fvar
+	(lambda(pe)
+		(string-append "mov rax, ["(get-label-from-global-var-table (cadr pe) global-var-table)"]\n")))
+(define cg-or
+    (lambda (expr)
+        (let ((exit (end_of_or)) (arg_start (caadr expr)))
             (string-append
-                (code-gen first_arg)
+                (code_gen arg_start)
                 (fold-right
                     string-append
                     ""
                     (map (lambda (next-el)
                             (string-append "cmp rax , const_4\n"
-                                           "jne " exit_lbl "\n"
-                                           (code-gen next-el)))
-                    		rest_args))
-                exit_lbl ":\n"))))
+                                           "jne" " " exit "\n"
+                                           (code_gen next-el)))
+                    		(cdadr expr)))
+                exit ":\n"))))
 
-(define gen-if
-    (lambda (pe)
-        (let ((exit_lbl (exit_if3_lbl)) (else_lbl (else_if3_lbl)) (test_if3 (cadr pe)) (then_if3 (caddr pe)) (else_if3 (cadddr pe)))
-            (string-append
-                (code-gen test_if3)
-                "cmp rax, const_4\n"
-                "je "else_lbl"\n"
-                (code-gen then_if3)
-                "jmp "exit_lbl"\n"
-                else_lbl":\n"
-                (code-gen else_if3)
-                exit_lbl":\n"))))
 
-(define gen-seq
+
+(define cg-seq
     (lambda (pe)
         (fold-left
             string-append
             ""
-            (map code-gen (cadr pe)))))
+            (map code_gen (cadr pe)))))
 
-(define gen-app
+(define cg-app
     (lambda (pe)
-        (let ((args (reverse (caddr pe))) (proc (cadr pe)) (exit_lbl (exit_app_lbl)))
+        (let ((args (reverse (caddr pe))) (func (cadr pe)) (exit (end_of_applic)))
         (string-append
         	;"push const_2\n"
             (fold-left
@@ -486,29 +418,28 @@
                 ""
                 (map (lambda (el)
                     (string-append
-                        (code-gen el)
+                        (code_gen el)
                         "push rax\n"))
                  args))
             "push "(number->string (length args))"\n"
-			(code-gen proc)
-			"mov rax, [rax]\n"
+			(code_gen func)
+			"\t " "mov rax, [rax]\n"
 			"mov rbx, rax\n"
 			"TYPE rbx\n"
-
             "cmp rbx, T_CLOSURE\n"
-            "jne "exit_lbl"\n"
-
+            "jne "exit"\n"
+            "\t \t \n"
             "mov rbx, rax\n"            
 			"CLOSURE_ENV rbx\n"
-			"push rbx\n"			;push env
+			"push rbx\n"	
             "CLOSURE_CODE rax\n"
             "call rax\n"
-            exit_lbl":\n"
-            "add rsp, " (number->string (* 8 (+ 2 (length args))) ) "\n"))))
+            exit":\n"
+            "add rsp, " (number->string (* (+ 2 (length args)) 8)) " \n"))))
 
-(define gen-tc-app
+(define cg-tc-app
     (lambda (pe)
-        (let ((args (reverse (caddr pe))) (proc (cadr pe)) (exit_lbl (exit_app_lbl)) (for_copy_args (for_copy_args_lbl)) (end_of_copy_args (end_of_copy_args_lbl)))
+        (let ((args (reverse (caddr pe))) (proc (cadr pe)) (exit (end_of_applic)) (loop_to_copy_args (loop_to_copy_args)) (end_of_copy_args (end_of_copy_args_lbl)))
         (string-append
         	;"push const_2\n"
             (fold-left
@@ -516,89 +447,93 @@
                 ""
                 (map (lambda (el)
                     (string-append
-                        (code-gen el)
+                        (code_gen el)
                         "push rax\n"))
                  args))
             "push "(number->string (length args))"\n"
-			(code-gen proc)
+			(code_gen proc)
 			"mov rax, [rax]\n"
 			"mov rbx, rax\n"
-			"TYPE rbx\n"
+			"\t \n TYPE rbx\n"
             "cmp rbx, T_CLOSURE\n"
-            "jne "exit_lbl"\n"
+            "jne "exit"\n"
 
             "mov rbx, rax\n"            
 			"CLOSURE_ENV rbx\n"
 			"push rbx\n"
-			
-			"push ret_addr\n" ;save return address
+			" \t ;; save the ret address \n"
+			"push ret_addr\n" 
 			"mov r8, rbp\n"
 			"mov rbp, qword[r8]\n"
 			"mov r11,rsp\n"
-
 			"mov r15,arg_count\n"
 			"add r15, 5\n" 
-
-			;copy arguments into rbp
-			"mov rdi, "(number->string (+ 4 (length args))) "\n"
-			for_copy_args":\n"
+			" \t ;copy the args \n"
+			"mov rdi, "(number->string (+ (length args) 4)) "\n"
+			loop_to_copy_args":\n"
 			"cmp rdi, 0\n"
 			"je "end_of_copy_args"\n"
-
 			"mov r12, rdi\n"
 			"dec r12\n"
 			"shl r12, 3\n"
-
 			"mov r10,qword[r11+r12]\n"
 			"dec r15\n"
 			"mov r12,r15\n"
 			"shl r12, 3\n"
 			"mov qword[r8+r12],r10\n"
 			"dec rdi\n"
-			
-			"jmp "for_copy_args"\n"
+			";\t copy args \n"
+			"jmp "loop_to_copy_args"\n"
 			end_of_copy_args":\n"
-
 			"mov r12,r15\n"
 			"shl r12, 3\n"
 			"lea rsp,[r8+r12]\n"
-
             "CLOSURE_CODE rax\n"
             "jmp rax\n"
-
-            exit_lbl":\n"
-            ;"add rsp, " (number->string (* 8 (+ 3 (length args))) ) "\n"
+            exit":\n"
         	))))
-
-
-(define gen-lambda-simple
+(define cg-if ;if
     (lambda (pe)
-        (set! lexical_env (+ lexical_env 1))
+        (let ((exit (end_of_if)) (else_part (else_of_if)) (test_if3 (cadr pe)) (if_then_part (caddr pe)) (if_else_part (cadddr pe)))
+            (string-append
+                (code_gen test_if3)
+                "cmp rax, const_4\n"
+                "je "else_part"\n"
+                (code_gen if_then_part)
+                "jmp "exit"\n"
+                else_part":\n"
+                (code_gen if_else_part)
+                exit":\n"))))
+(define cg-lambda-simple ;lambda-simple
+    (lambda (pe)
+        (set! env_level (+ env_level 1))
             (let* ((args (cadr pe)) (body (caddr pe))
-            	  (skip_code_label (skip_code_lbl)) (for_copy_args (for_copy_args_lbl)) (end_of_copy_args (end_of_copy_args_lbl))
-            	  (for_copy_envs (for_copy_envs_lbl)) (end_of_copy_envs (end_of_copy_envs_lbl)) (code_label (code_lbl)) (new_env (new_env_lbl))
-                  (str-gen (string-append
+            	  (end_of_code (end_of_code)) (loop_to_copy_args (loop_to_copy_args)) (end_of_copy_args (end_of_copy_args_lbl))
+            	  (for_copy_envs (loop_to_copy_envs)) (end_of_copy_envs (end_of_copy_envs)) (code_label (code)) (new_env (new_env))
+                  (cg_string (string-append
                   	;create new env
                   	"mov rbx, 0\n";env
-                    "mov rax, " (number->string lexical_env) "\n";major
+                    "mov rax, " (number->string env_level) "\n";major
                     "cmp rax, 0\n"
                     "je "end_of_copy_envs"\n"
-                    "mov rdi, "(number->string (* 8 (+ 1 lexical_env)))"\n";for allocating space for new extended env 
+                    "mov rdi, "(number->string (* 8 (+ 1 env_level)))"\n";for allocating space for new extended env 
                     "call malloc\n"
-                    "mov rbx, rax\n"	;rbx = malloc(8*(n+1)) **this is x**
+                    "mov rbx, rax\n"	
                     
                     "mov rax, arg_count\n"
 					"mov rdi, 8\n"
 					"mul rdi\n"
-                    "push rbx\n"	;save value of rbx 
+                    "push rbx\n"	
                     "mov rdi, rax\n"
                     "call malloc\n"
                     "pop rbx\n"
-                    "mov rcx, rax\n"	;rcx = malloc(8*m) **params of lambda**
-
-                    ;copy arguments into rcx
+                    "\t "
+                    "mov rcx, rax\n"	
+                    "push rbx\n"
+                    "\t ;copy args \n"
 					"mov rdi, 0\n"
-					for_copy_args":\n"
+					"pop rbx\n"
+					loop_to_copy_args":\n"
 					"cmp rdi, arg_count\n"
 					"je "end_of_copy_args"\n"
 					"mov rax, 8\n"
@@ -606,17 +541,19 @@
 					"mov rdx, An(rdi)\n"   ; rdx = i'th argument
 					"mov qword [rcx+rax], rdx\n" ; copy arg i into [rcx+8*i]
 					"inc rdi\n"
-					"jmp "for_copy_args"\n"
+
+
+
+
+					"jmp "loop_to_copy_args"\n"
 					end_of_copy_args":\n"
-
 					"mov qword [rbx], rcx\n"
-
 					"mov r14, env\n"		; rdx=previous env
 					"cmp r14, 0\n"
 					"je "end_of_copy_envs"\n"
 					"mov rdi, 0\n"
 					for_copy_envs":\n"
-					"cmp rdi, " (number->string lexical_env) "\n"
+					"cmp rdi, " (number->string env_level) "\n"
 					"je "end_of_copy_envs"\n"
 					"mov rax, 8\n"
 					"mul rdi\n"
@@ -633,15 +570,15 @@
                     "call malloc\n" ;rax = malloc(8*2)
                     "pop rcx\n"
                     "pop rbx\n"
-
+                    "push rbx\n"
                     "MAKE_LITERAL_CLOSURE rax, rbx, " code_label "\n"
-
-                    "jmp "skip_code_label"\n"
+                    "pop rbx\n"
+                    "jmp "end_of_code"\n"
 					;create code
 					code_label":\n"
 					"push rbp\n"
 					"mov rbp, rsp\n"
-					(code-gen body)
+					(code_gen body)
 					"mov rbx, rax\n"
 					"mov rax, arg_count\n"
 					"add rax, 1\n"
@@ -651,127 +588,115 @@
 					"mov rax, rbx\n"
 					"leave\n"
 					"ret\n"
-					skip_code_label":\n")))
-        		(set! lexical_env (- lexical_env 1)) 
-        		str-gen)))
+					end_of_code":\n")))
+        		(set! env_level (- env_level 1)) 
+        		cg_string)))
 
-(define gen-lambda-opt
+(define cg-lambda-opt
     (lambda (pe)
-        (set! lexical_env (+ lexical_env 1))
+        (set! env_level (+ env_level 1))
             (let* ((args (cadr pe))
             	   (body (cadddr pe))
-            	   (skip_code_label (skip_code_lbl)) (for_copy_args (for_copy_args_lbl)) (end_of_copy_args (end_of_copy_args_lbl))
-            	   (for_copy_envs (for_copy_envs_lbl)) (end_of_copy_envs (end_of_copy_envs_lbl)) (code_label (code_lbl)) (new_env (new_env_lbl))
-            	   (for_fix_stack (for_fix_stack_lbl)) (end_of_fix_stack (end_of_fix_stack_lbl)) (dont_push_arg_label (dont_push_lbl))
-                   (str-gen (string-append
+            	   (end_of_code (end_of_code)) (loop_to_copy_args (loop_to_copy_args)) (end_of_copy_args (end_of_copy_args_lbl))
+            	   (for_copy_envs (loop_to_copy_envs)) (end_of_copy_envs (end_of_copy_envs)) (code_label (code)) (new_env (new_env))
+            	   (for_fix_stack (loop_to_fix_stack)) (end_of_fix_stack (end_of_of_stack)) (dont_push_arg_label (not_pushing))
+                   (cg_string (string-append
                   	;create new env
                   	"mov rbx, 0\n";env
-                    "mov rax, " (number->string lexical_env) "\n";major
+                    "mov rax, " (number->string env_level) "\n"
                     "cmp rax, 0\n"
                     "je "end_of_copy_envs"\n"
-                    "mov rdi, "(number->string (* 8 (+ 1 lexical_env)))"\n";for allocating space for new extended env 
+                    "mov rdi, "(number->string (* 8 (+ 1 env_level)))"\n" 
                     "call malloc\n"
-                    "mov rbx, rax\n"	;rbx = malloc(8*(n+1)) **this is x**
-                    
+                    "mov rbx, rax\n"	 
                     "mov rax, arg_count\n"
 					"mov rdi, 8\n"
 					"mul rdi\n"
-                    "push rbx\n"	;save value of rbx 
+                    "push rbx\n"	
                     "mov rdi, rax\n"
                     "call malloc\n"
                     "pop rbx\n"
-                    "mov rcx, rax\n"	;rcx = malloc(8*m) **params of lambda**
-
-                    ;copy arguments into rcx
+                    "mov rcx, rax\n"	
 					"mov rdi, 0\n"
-					for_copy_args":\n"
+					loop_to_copy_args":\n"
 					"cmp rdi, arg_count\n"
 					"je "end_of_copy_args"\n"
 					"mov rax, 8\n"
 					"mul rdi\n"
-					"mov rdx, An(rdi)\n"   ; rdx = i'th argument
-					"mov qword [rcx+rax], rdx\n" ; copy arg i into [rcx+8*i]
+					"mov rdx, An(rdi)\n"  
+					"mov qword [rcx+rax], rdx\n" 
 					"inc rdi\n"
-					"jmp "for_copy_args"\n"
+					"jmp "loop_to_copy_args"\n"
 					end_of_copy_args":\n"
 
 					"mov qword [rbx], rcx\n"
 
-					"mov r14, env\n"		; r14=previous env
+					"mov r14, env\n"		
 					"cmp r14, 0\n"
 					"jle "end_of_copy_envs"\n"
 					"mov rdi, 0\n"
 					for_copy_envs":\n"
-					"cmp rdi, " (number->string lexical_env) "\n"
+					"cmp rdi, " (number->string env_level) "\n"
 					"je "end_of_copy_envs"\n"
 					"mov rax, 8\n"
 					"mul rdi\n"
-					"mov rcx, qword [r14+rax]\n" ; rcx = i'th env
-					"mov qword [rbx+rax+8], rcx\n" ; copy env i into [rbx+8*i+8]
+					"mov rcx, qword [r14+rax]\n"
+					"mov qword [rbx+rax+8], rcx\n"
 					"inc rdi\n"
 					"jmp "for_copy_envs"\n"
-					
+					"\t ;copy env in loop \n"
 					end_of_copy_envs":\n"
-                    ;create target
                     "push rbx\n"
                     "push rcx\n"
                     "mov rdi, 16\n"
-                    "call malloc\n" ;rax = malloc(8*2)
+                    "call malloc\n" 
                     "pop rcx\n"
                     "pop rbx\n"
-
                     "MAKE_LITERAL_CLOSURE rax, rbx, " code_label "\n"
-
-                    "jmp "skip_code_label"\n"
-
+                    "jmp "end_of_code"\n"
 					code_label":\n"
 					"push rbp\n"
 					"mov rbp, rsp\n"
 					"mov rbx, const_2\n"
 					"mov r10, arg_count\n"
-
 					for_fix_stack":\n"
 					"cmp r10, "(number->string (length args)) "\n"
 					"je " end_of_fix_stack "\n"
-					
 					"mov rdi, 8\n"
 					"call malloc\n"			
 					"mov rdx, rbp\n"				
-					"add rdx, 4*8\n"				;rdx point to n+m in stack (offset)
-					"mov r11, r10\n"				;r10 is helper for point of arg[i]
+					"add rdx, 4*8\n"	
+					"\t ;stack fixer \n"			
+					"mov r11, r10\n"				
 					"dec r11\n"
-					"shl r11, 3\n"				;now offset+r10 = address of curr arg				
-					"add rdx, r11\n"				;rdx = address of arg[i]
+					"shl r11, 3\n"							
+					"add rdx, r11\n"				
 					"mov rdx, qword [rdx]\n"		
-					
-					"MAKE_MALLOC_LITERAL_PAIR rax, rdx, rbx\n"	;rax = target, rbx = cdr, rcx = car
-					"mov rbx, rax\n"				;rbx ponints to the new pair as cdr for the new allocate in next iteration
-					"dec r10\n"					
+					"MAKE_MALLOC_LITERAL_PAIR rax, rdx, rbx\n"	
+					"\t ;;rax <- target, rbx <- cdr, rcx <- car \n"
+					"mov rbx, rax\n"
+					"push rax\n"				
+					"dec r10\n"		
+					"pop rax\n"			
 					"jmp " for_fix_stack "\n"
 					
 					end_of_fix_stack":\n"
 					"cmp rbx, const_2\n"
-					;"je "dont_push_arg_label"\n"
+					"\t; ---------------------dont push the args! \n"
 					"mov qword [rbp+4*8+"(number->string (length args))"*8], rbx\n"	;add the list in stack after const params (not optinals)
-					;dont_push_arg_label":\n"
-					;"mov qword [rbp+5*8+"(number->string (length args))"*8], const_2\n"
-					;"mov qword [rbp + 3*8], "(number->string (+ 1 (length args)))"\n" ;update arg_count
-					;"add rsp, r9\n"
-
-					(code-gen body)
-					
+					(code_gen body)
 					"leave\n"
 					"ret\n"
-					skip_code_label":\n")))
-        (set! lexical_env (- lexical_env 1)) 
-	str-gen)))
+					end_of_code":\n")))
+        (set! env_level (- env_level 1)) 
+	cg_string)))
 
-(define gen-pvar
+(define cg-pvar
 	(lambda (pe)
 		(let ((minor (caddr pe)))
 			(string-append "mov rax, qword [rbp+32+"(number->string minor)"*8]\n"))))
 
-(define gen-bvar
+(define cg-bvar
 	(lambda (pe)
 		(let ((major (caddr pe)) (minor (cadddr pe)))
 			(string-append 
@@ -781,7 +706,7 @@
 			"mov rax, qword [rax+"(number->string minor)"*8]\n"
 			))))
 
-(define gen-set
+(define cg-set
 	(lambda (pe)
 		(let ((tag (caadr pe))
                (var (cadadr pe))
@@ -789,7 +714,7 @@
 			(cond ((equal? tag 'pvar) 
                     (let ((minor (car (cddadr pe))))
 						(string-append
-						(code-gen val)
+						(code_gen val)
 						"mov qword [rbp+8*(4+"(number->string minor)")], rax\n"
 						"mov rax, const_1\n"
 						)))
@@ -797,45 +722,45 @@
                     (let ((major (car (cddadr pe)))
                          (minor (car(cdr (cddadr pe)))))
                             (string-append
-                                (code-gen val)
+                                (code_gen val)
                                 "mov rbx, qword [rbp+16]\n"
                                 "mov rbx, qword [rbx+8*"(number->string major)"]\n"
                                 "mov qword [rbx+8*"(number->string minor)"], rax\n"
 								"mov rax, const_1\n")))
                        ((equal? tag 'fvar) 
                             (string-append
-                                (code-gen val)
+                                (code_gen val)
                                 "mov ["(get-label-from-global-var-table var global-var-table)"], rax\n"
                                 "mov rax, const_1\n"
                                 ))
                       (else "wrong input")))))
 
-(define gen-box
+(define cg-box
 	(lambda (pe)
 		(let ((var (cadr pe)))
 			(string-append
-				(code-gen var)
+				(code_gen var)
 				"mov rbx, rax\n"
 				"mov rdi, 8\n"
 				"call malloc\n"
 				"mov qword [rax], rbx\n"
 			))))
 
-(define gen-box-get
+(define cg-box-get
 	(lambda (pe)
 		(let ((var (cadr pe)))
 			(string-append
-				(code-gen var)
+				(code_gen var)
 				"mov qword rax, [rax]\n"
 			))))
 
-(define gen-box-set
+(define cg-box-set
 	(lambda (pe)
 		(let ((var (cadr pe)) (val (caddr pe)))
 			(string-append
-				(code-gen val)
+				(code_gen val)
 				"mov rbx, rax\n"
-				(code-gen var)
+				(code_gen var)
 				"mov qword [rax], rbx\n"
 				"mov rax, const_1\n"
 			))))
@@ -890,53 +815,53 @@
 										 (bin_div 1 (car x)) 
 										 (fold_left (lambda (acc y) (bin_div acc y)) (car x) (cdr x)))))\n")
 
-(define code-gen-library-functions
+(define code-cg-library-functions
     (lambda ()
         (string-append
-            (gen-cons)
-            (gen-car)
-            (gen-cdr)
-            (gen-null?)
-            (gen-pair?)
-            (gen-boolean?)
-            (gen-char?)
-            (gen-integer?)
-            (gen-procedure?)
-            (gen-string?)
-            (gen-symbol?)
-            (gen-vector?)
-            (gen-zero?)
-            (gen-apply)
-            (gen-make-string)
-            (gen-make-vector)
-            (gen-not)
-            (gen-string-length)
-            (gen-vector-length)
-            (gen-vector)
-            (gen-char->integer)
-            (gen-integer->char)
-            (gen-string-ref)
-            (gen-vector-ref)
-            (gen-symbol->string)
-            (gen-string->symbol)
-            (gen-bin-mul)
-            (gen-bin-div)
-            (gen-bin-minus)
-            (gen-bin-equal)
-            (gen-bin-less-than)
-            (gen-bin-greater-than)
-            (gen-string-set)
-            (gen-vector-set)
-            (gen-bin-plus)
-            (gen-remainder)
-            (gen-denominator)
-            (gen-numerator)
-            (gen-number?)
-            (gen-rational?)
-            (gen-eq?)
+            (cg-cons)
+            (cg-car)
+            (cg-cdr)
+            (cg-null?)
+            (cg-pair?)
+            (cg-boolean?)
+            (cg-char?)
+            (cg-integer?)
+            (cg-procedure?)
+            (cg-string?)
+            (cg-symbol?)
+            (cg-vector?)
+            (cg-zero?)
+            (cg-apply)
+            (cg-make-string)
+            (cg-make-vector)
+            (cg-not)
+            (cg-string-length)
+            (cg-vector-length)
+            (cg-vector)
+            (cg-char->integer)
+            (cg-integer->char)
+            (cg-string-ref)
+            (cg-vector-ref)
+            (cg-symbol->string)
+            (cg-string->symbol)
+            (cg-bin-mul)
+            (cg-bin-div)
+            (cg-bin-minus)
+            (cg-bin-equal)
+            (cg-bin-less-than)
+            (cg-bin-greater-than)
+            (cg-string-set)
+            (cg-vector-set)
+            (cg-bin-plus)
+            (cg-remainder)
+            (cg-denominator)
+            (cg-numerator)
+            (cg-number?)
+            (cg-rational?)
+            (cg-eq?)
             )))
 
-(define validate-type-code-gen
+(define validate-type-code_gen
 
     (lambda (type-label tag)
     	(let ((lower-case-type-label (string-downcase type-label)))
@@ -971,43 +896,43 @@
 	            
 	            lower-case-type-label"_exit:\n"))))
         
-(define gen-null?
+(define cg-null?
     (lambda()
-        (validate-type-code-gen "NIL" 'null?)))
+        (validate-type-code_gen "NIL" 'null?)))
 
-(define gen-pair?
+(define cg-pair?
     (lambda()
-        (validate-type-code-gen "PAIR" 'pair?)))
+        (validate-type-code_gen "PAIR" 'pair?)))
         
-(define gen-boolean?
+(define cg-boolean?
     (lambda()
-        (validate-type-code-gen "BOOL" 'boolean?)))
+        (validate-type-code_gen "BOOL" 'boolean?)))
         
-(define gen-char?
+(define cg-char?
     (lambda()
-        (validate-type-code-gen "CHAR" 'char?)))
+        (validate-type-code_gen "CHAR" 'char?)))
         
-(define gen-integer?
+(define cg-integer?
     (lambda()
-        (validate-type-code-gen "INTEGER" 'integer?)))
+        (validate-type-code_gen "INTEGER" 'integer?)))
         
-(define gen-procedure?
+(define cg-procedure?
     (lambda()
-        (validate-type-code-gen "CLOSURE" 'procedure?)))
+        (validate-type-code_gen "CLOSURE" 'procedure?)))
         
-(define gen-string?
+(define cg-string?
     (lambda()
-        (validate-type-code-gen "STRING" 'string?)))
+        (validate-type-code_gen "STRING" 'string?)))
         
-(define gen-symbol?
+(define cg-symbol?
     (lambda()
-        (validate-type-code-gen "SYMBOL" 'symbol?)))
+        (validate-type-code_gen "SYMBOL" 'symbol?)))
         
-(define gen-vector?
+(define cg-vector?
     (lambda()
-        (validate-type-code-gen "VECTOR" 'vector?)))
+        (validate-type-code_gen "VECTOR" 'vector?)))
 
-(define gen-zero?
+(define cg-zero?
     (lambda()
         (string-append
             "mov rdi, 16\n"
@@ -1048,7 +973,7 @@
 	        "ret\n"
 	        "zero?_exit:\n" )))
 
-(define gen-number?
+(define cg-number?
     (lambda()
         (string-append
             "mov rdi, 16\n"
@@ -1083,7 +1008,7 @@
 	        "ret\n"
 	        "number?_exit:\n" )))
 
-(define gen-not
+(define cg-not
     (lambda ()
         (string-append
             "mov rdi, 16\n"
@@ -1113,7 +1038,7 @@
 
             "not_exit:\n")))
 
-(define gen-car
+(define cg-car
     (lambda()
         (string-append
             "mov rdi, 16\n"
@@ -1135,7 +1060,7 @@
             
             "car_exit:\n")))
 
-(define gen-cdr
+(define cg-cdr
     (lambda()
         (string-append
             "mov rdi, 16\n"
@@ -1157,7 +1082,7 @@
             
             "cdr_exit:\n")))
 
-(define gen-cons
+(define cg-cons
     (lambda()
         (string-append
             
@@ -1185,7 +1110,7 @@
             
             "cons_exit:\n")))
 
-(define gen-rational?
+(define cg-rational?
  	(lambda()       
 		(string-append
             "mov rdi, 16\n"
@@ -1220,7 +1145,7 @@
 	        "ret\n"
 	        "rational?_exit:\n" )))
 
-(define gen-eq?
+(define cg-eq?
  	(lambda()       
 		(string-append
             "mov rdi, 16\n"
@@ -1254,7 +1179,7 @@
 	        "ret\n"
 	        "eq?_exit:\n" )))
 
-(define gen-bin-equal
+(define cg-bin-equal
  	(lambda()       
 		(string-append
             "mov rdi, 16\n"
@@ -1319,7 +1244,7 @@
 	        "ret\n"
 	        "bin_equal_exit:\n" )))
 
-(define gen-bin-plus
+(define cg-bin-plus
 	(lambda ()
 		(string-append
             "mov rdi, 16\n"
@@ -1473,7 +1398,7 @@
 	        "ret\n"
 	        "bin_plus_exit:\n")))
 
-(define gen-bin-minus
+(define cg-bin-minus
 	(lambda ()
 		(string-append
             "mov rdi, 16\n"
@@ -1639,7 +1564,7 @@
 	        "ret\n"
 	        "bin_minus_exit:\n")))
 
-(define gen-bin-mul
+(define cg-bin-mul
 	(lambda ()
 		(string-append
             "mov rdi, 16\n"
@@ -1792,7 +1717,7 @@
 	        "ret\n"
 	        "bin_mul_exit:\n")))
 
-(define gen-bin-div
+(define cg-bin-div
 	(lambda ()
 		(string-append
             "mov rdi, 16\n"
@@ -1969,7 +1894,7 @@
 	        "ret\n"
 	        "bin_div_exit:\n")))
 
-(define gen-bin-less-than
+(define cg-bin-less-than
  	(lambda()       
 		(string-append
             "mov rdi, 16\n"
@@ -2015,7 +1940,7 @@
 	        "ret\n"
 	        "bin_less_than_exit:\n" )))
 
-(define gen-bin-greater-than
+(define cg-bin-greater-than
  	(lambda()       
 		(string-append
             "mov rdi, 16\n"
@@ -2061,7 +1986,7 @@
 	        "ret\n"
 	        "bin_greater_than_exit:\n" )))
 
-(define gen-char->integer
+(define cg-char->integer
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2098,7 +2023,7 @@
 	        "char_to_integer_exit:\n" )
 	))
 
-(define gen-integer->char
+(define cg-integer->char
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2135,7 +2060,7 @@
 	        "integer_to_char_exit:\n" )
 	))
 
-(define gen-numerator
+(define cg-numerator
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2175,7 +2100,7 @@
 	        "numerator_exit:\n" )
 	))
 
-(define gen-denominator
+(define cg-denominator
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2217,7 +2142,7 @@
 	        "denominator_exit:\n" )
 	))
 
-(define gen-remainder
+(define cg-remainder
  	(lambda()       
 		(string-append
             "mov rdi, 16\n"
@@ -2275,7 +2200,7 @@
 	        "ret\n"
 	        "remainder_exit:\n" )))
 
-(define gen-string-length
+(define cg-string-length
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2311,7 +2236,7 @@
 	        "string_length_exit:\n" )
 	))
 
-(define gen-vector-length
+(define cg-vector-length
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2347,7 +2272,7 @@
 	        "vector_length_exit:\n" )
 	))
 
-(define gen-string-ref
+(define cg-string-ref
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2395,7 +2320,7 @@
 	        "ret\n"
 	        "string_ref_exit:\n" )))
 
-(define gen-vector-ref
+(define cg-vector-ref
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2441,7 +2366,7 @@
 	        "ret\n"
 	        "vector_ref_exit:\n" )))
 
-(define gen-string-set
+(define cg-string-set
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2499,7 +2424,7 @@
 	        "ret\n"
 	        "string_set_exit:\n" )))
 
-(define gen-vector-set
+(define cg-vector-set
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2548,7 +2473,7 @@
 	        "ret\n"
 	        "vector_set_exit:\n" )))
 
-(define gen-make-string
+(define cg-make-string
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2624,7 +2549,7 @@
 	        "ret\n"
 	        "make_string_exit:\n" )))
 
-(define gen-make-vector
+(define cg-make-vector
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2699,7 +2624,7 @@
 	        "ret\n"
 	        "make_vector_exit:\n" )))
 
-(define gen-vector
+(define cg-vector
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
@@ -2747,7 +2672,7 @@
 	        "ret\n"
 	        "custom_vector_exit:\n" )))
 
-(define gen-apply
+(define cg-apply
  	(lambda()       
 		(string-append
             "mov rdi, 16\n"
@@ -2840,7 +2765,7 @@
 	        "apply_exit:\n" )))
 
 
-(define gen-symbol->string
+(define cg-symbol->string
 	(lambda ()
 		(string-append
 			"mov rdi, 16\n"
@@ -2862,7 +2787,7 @@
 	        "ret\n"
 	        "symbol_to_string_exit:\n" )))
 
-(define gen-string->symbol
+(define cg-string->symbol
 	(lambda ()
 		(string-append
 			"mov rdi, 16\n"
@@ -2934,14 +2859,49 @@
 	        "ret\n"
 	        "string_to_symbol_exit:\n"      
 	)))
+(define pipeline
+	(lambda (s)
+		((star <sexpr>) s 
+			(lambda (m r)
+				(map (lambda (e)
+						(annotate-tc
+							(pe->lex-pe
+								(box-set
+									(remove-applic-lambda-nil
+										(parse e))))))
+					  m))
+	   		(lambda (f) 'fail))))
+
+(define file->list
+	(lambda (input-file)
+		(let ((in-port (open-input-file input-file)))
+			(letrec ((run (lambda ()
+							(let ((ch (read-char in-port)))
+								(if (eof-object? ch)
+									(begin (close-input-port in-port) '())
+									(cons ch (run)))))))
+				(run)))))
+
+(define string->file
+	(lambda (out-file str)
+		(if (file-exists? out-file) (delete-file out-file))
+		(let ((out-port (open-output-file out-file)))
+			(letrec ((run
+				(lambda (lst)
+					(if (null? lst) (close-output-port out-port)
+								(begin
+									(write-char (car lst) out-port)
+									(run (cdr lst)))))))
+				(run (string->list str))))))
+
 
 (define compile-scheme-file
 	(lambda (source-file target-file)
 		(let* ((parsed-exp-list 	(pipeline (append-scheme-lib-functions (file->list source-file))))
 			   (epilogue 			"push qword [rax]\ncall write_sob_if_not_void\nadd rsp, 1*8\n"))
-			   (create-const-table parsed-exp-list)
+			   (create-c-table parsed-exp-list)
 
-			   ;;(display (format "const-table ~a\n" const-table))
+			   ;;(display (format "c-table ~a\n" c-table))
 
 
 			   (create-global-var-table parsed-exp-list)
@@ -2952,16 +2912,16 @@
 						"%include \"project/scheme.s\"\nsection .data\nstart_of_data:\n"
 						(get-const-string)
 						(get-fvar-string)
-						(gen-symbol-table const-table 0 (count-symbols))
+						(cg-symbol-table c-table 0 (count-symbols))
 						"\nsection .text\nmain:\n"
 						"push 0\n"
 						"push 0\n"
 						"push exit_compilation\n"
 						"push rbp\n"
 						"mov rbp, rsp\n"
-						(code-gen-library-functions)
+						(code-cg-library-functions)
 						(fold-left (lambda(acc pe) 
-	                                    (string-append acc (code-gen pe) epilogue))
+	                                    (string-append acc (code_gen pe) epilogue))
 									""
 								parsed-exp-list)
 						"exit_compilation:\n"
@@ -2969,3 +2929,6 @@
 						"mov rax, 0\n"
 						"call exit\n"
 						)))))
+
+
+
