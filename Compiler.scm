@@ -458,23 +458,80 @@
     (string-append (make-const-label index)
 		   tab "dq MAKE_LITERAL_FRACTION(" const-label (number->string numIndx) ", " const-label (number->string denumIndx) ")" newLine)))
 
+(define list-index
+  (lambda (e lst)
+    (if (null? lst)
+	-1
+	(if (eq? (car lst) e)
+	    0
+	    (if (= (list-index e (cdr lst)) -1) 
+		-1
+		(+ 1 (list-index e (cdr lst))))))))
+
 (define append-params
   (lambda (params)
-    (fold-left (lambda (result current)
-		 (string-append result
-				(if (not (equal? current (first params)))
-				    ", "
-				    " ")
-				(number->string current)))
-	       ""
-	       params)))
+    (if (= (length params) 0) 
+	""
+	(fold-left (lambda (result current)
+		     (string-append result ", " current))
+		   (car params)
+		   (cdr params)))))
+
+
+(define str-list->delimited-str
+	(lambda (lst)
+		(if (= (length lst) 0) 
+			""
+			(fold-left (lambda (acc x) (string-append acc ", " x))
+						(car lst)
+						(cdr lst)))))
+
+(define string->str-list 
+  (lambda (chars)
+    (let* ((ans (fold-left
+		 (lambda (acc ch)
+		   (let ((curr-str (car acc))
+			 (ans-acc (cdr acc)))
+		     (cond ((equal? ch #\nul) 
+			    (if (is-empty-string curr-str)
+				(cons "" (append ans-acc (list "CHAR_NUL")))
+				(cons "" (append ans-acc
+						 (list (string-append "\"" curr-str "\""))
+						 (list "CHAR_NUL")))))
+			   ((equal? ch #\tab)
+			    (if (is-empty-string curr-str)
+				(cons "" (append ans-acc (list "CHAR_TAB")))
+				(cons "" (append ans-acc (list (string-append "\"" curr-str "\""))
+						 (list "CHAR_TAB")))))
+			   ((equal? ch #\newline)
+			    (if (is-empty-string curr-str)
+				(cons "" (append ans-acc (list "CHAR_NEWLINE")))
+				(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_NEWLINE")))))
+			   ((equal? ch #\return)
+			    (if (is-empty-string curr-str)
+				(cons "" (append ans-acc (list "CHAR_RETURN")))
+				(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_RETURN")))))
+			   ((equal? ch #\space) 
+			    (if (is-empty-string curr-str)
+				(cons "" (append ans-acc (list "CHAR_SPACE")))
+				(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_SPACE")))))
+			   (else 
+			    (cons (string-append curr-str (string (integer->char ch))) ans-acc)))))
+		 
+		 (cons "" '())
+		 chars)))
+      (if (equal? (car ans) "")
+	  (cdr ans)
+	  (append (cdr ans) (list (string-append "\"" (car ans) "\""))))
+      )
+    ))
 
 (define cg-T-string
   (lambda (length chars index)
     ;;(display (format "generating string const = ~a\n" chars))
     (string-append
      (make-const-label index)
-     tab "MAKE_LITERAL_STRING" (append-params chars) newLine)))
+     tab "MAKE_LITERAL_STRING" (append-params (string->str-list chars)) newLine)))
 
 (define cg-T-symbol
   (lambda (stringIndex index)
@@ -755,21 +812,24 @@
 	   
 	   ((tag? 'box-set pe)
 	    ;;(box-set! (*var var * *) value)
-	    (let ((var (second pe))
+	    (let* ((var (second pe))
 		  (value (third pe))
 		  (cg-value (code-gen value)))
 	      (string-append cg-value
-			     (cond ((tag? 'bvar var)
-				    (cg-box-set-bvar (cdr var)))
-				   ((tag? 'pvar var)
-				    (cg-box-set-pvar (cdr var)))
-				   ((tag? 'fvar var)
-				    (cg-box-set-fvar (cdr var)))
-				   (else
-				    (string-append
-				     "Undefined box-set variable type"
-				     newLine)))
-			     tab "MOV rax, sobVoid" newLine)))
+			     tab "MOV rbx, rax" newLine
+			     (code-gen var)
+			     tab "MOV qword [rax], rbx" newLine
+			     ;;(cond ((tag? 'bvar var)
+		;;		    (cg-box-set-bvar (cdr var)))
+	;;;			   ((tag? 'pvar var)
+	;;			    (cg-box-set-pvar (second var) (third var)))
+	;;;			   ((tag? 'fvar var)
+	;;			    (cg-box-set-fvar (cdr var)))
+	;;			   (else
+	;;			    (string-append
+	;;			     "Undefined box-set variable type"
+	;;			     newLine)))
+			     tab "MOV rax, " sobVoid newLine)))
 	   (else
 	    (string-append ";;Code-Generation-Error" newLine))))))
 
@@ -842,8 +902,8 @@
   (lambda (major minor)
     (string-append
      tab "MOV RAX, qword [rbp + 2*8]" newLine
-     tab "MOV RAX, qword [RAX + " major "*8]" newLine
-     tab "MOV RAX, qword [RAX + " minor "*8]" newLine)))
+     tab "MOV RAX, qword [RAX + " (number->string major) "*8]" newLine
+     tab "MOV RAX, qword [RAX + " (number->string minor) "*8]" newLine)))
 
 (define cg-fvar ;var needs to be the symbol
   (lambda (var)
@@ -900,22 +960,19 @@
      tab "MOV rbx, qword [rbp + 2*8]" newLine
      tab "MOV rbx, qword [rbx + " (number->string major) "*8]" newLine
      tab "MOV rbx, qword [rbx + " (number->string minor) "*8]" newLine
-     tab "MOV qword [rbx], rax" newLine
-     tab "MOV rax, " sobVoid newLine)))
+     tab "MOV qword [rbx], rax" newLine)))
 
 (define cg-set-pvar
   (lambda (var minor)
     (string-append
-     tab "MOV qword [rbp + " (number->string (+ 4 minor)) "*8], RAX" newLine
-     tab "MOV rax, " sobVoid newLine)))
+     tab "MOV qword [rbp + " (number->string (+ 4 minor)) "*8], RAX" newLine)))
 
 (define cg-set-fvar
   ;;(set! (fvar var) value)
   ;; RAX = [|value|]
   (lambda (var)
     (string-append
-     tab "MOV qword [" fvar-label (number->string (f-table-get var)) "], RAX" newLine
-     tab "MOV rax, " sobVoid newLine)))
+     tab "MOV qword [" fvar-label (number->string (f-table-get var)) "], RAX" newLine)))
 
 ;;; Box
 
@@ -960,8 +1017,8 @@
   (lambda (var major minor)
     (string-append
      tab "MOV rbx, qword [rbp + 2*8]" newLine
-     tab "MOV rbx, qword [rbx + " major "*8]" newLine
-     tab "MOV rbx, qword [rbx + " minor "*8]" newLine
+     tab "MOV rbx, qword [rbx + " (number->string major) "*8]" newLine
+     tab "MOV rbx, qword [rbx + " (number->string minor) "*8]" newLine
      tab "MOV qword [rbx], rax" newLine
      )))
 
