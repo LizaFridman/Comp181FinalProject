@@ -738,7 +738,7 @@
 			     (cond ((tag? 'bvar var)
 				    (cg-set-bvar (cdr var)))
 				   ((tag? 'pvar var)
-				    (cg-set-pvar (cdr var)))
+				    (cg-set-pvar (second var) (third var)))
 				   ((tag? 'fvar var)
 				    (cg-set-fvar (cdr var)))
 				   (else
@@ -898,21 +898,24 @@
   (lambda (var major minor)
     (string-append
      tab "MOV rbx, qword [rbp + 2*8]" newLine
-     tab "MOV rbx, qword [rbx + " major "*8]" newLine
-     tab "MOV rbx, qword [rbx + " minor "*8]" newLine
-     tab "MOV qword [rbx], rax" newLine)))
+     tab "MOV rbx, qword [rbx + " (number->string major) "*8]" newLine
+     tab "MOV rbx, qword [rbx + " (number->string minor) "*8]" newLine
+     tab "MOV qword [rbx], rax" newLine
+     tab "MOV rax, " sobVoid newLine)))
 
 (define cg-set-pvar
   (lambda (var minor)
     (string-append
-     tab "MOV qword [rbp + " (+ 4 minor) "*8], RAX" newLine)))
+     tab "MOV qword [rbp + " (number->string (+ 4 minor)) "*8], RAX" newLine
+     tab "MOV rax, " sobVoid newLine)))
 
 (define cg-set-fvar
   ;;(set! (fvar var) value)
   ;; RAX = [|value|]
   (lambda (var)
     (string-append
-     tab "MOV qword [" fvar-label (number->string (f-table-get var)) "], RAX" newLine)))
+     tab "MOV qword [" fvar-label (number->string (f-table-get var)) "], RAX" newLine
+     tab "MOV rax, " sobVoid newLine)))
 
 ;;; Box
 
