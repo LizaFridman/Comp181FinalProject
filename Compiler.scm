@@ -463,8 +463,8 @@
 			"push rbx\n"
 			" \t ;; save the ret address \n"
 			"push ret_addr\n" 
-			"mov r8, rbp\n"
-			"mov rbp, qword[r8]\n"
+			"mov r9, rbp\n"
+			"mov rbp, qword[r9]\n"
 			"mov r11,rsp\n"
 			"mov r15,arg_count\n"
 			"add r15, 5\n" 
@@ -473,21 +473,21 @@
 			loop_to_copy_args":\n"
 			"cmp rdi, 0\n"
 			"je "end_of_copy_args"\n"
-			"mov r12, rdi\n"
-			"dec r12\n"
-			"shl r12, 3\n"
-			"mov r10,qword[r11+r12]\n"
+			"mov r10, rdi\n"
+			"dec r10\n"
+			"shl r10, 3\n"
+			"mov r12,qword[r11+r10]\n"
 			"dec r15\n"
-			"mov r12,r15\n"
-			"shl r12, 3\n"
-			"mov qword[r8+r12],r10\n"
+			"mov r10,r15\n"
+			"shl r10, 3\n"
+			"mov qword[r9+r10],r12\n"
 			"dec rdi\n"
 			";\t copy args \n"
 			"jmp "loop_to_copy_args"\n"
 			end_of_copy_args":\n"
-			"mov r12,r15\n"
-			"shl r12, 3\n"
-			"lea rsp,[r8+r12]\n"
+			"mov r10,r15\n"
+			"shl r10, 3\n"
+			"lea rsp,[r9+r10]\n"
             "CLOSURE_CODE rax\n"
             "jmp rax\n"
             exit":\n"
@@ -669,16 +669,16 @@
 					"push rbp\n"
 					"mov rbp, rsp\n"
 					"mov rbx, const_2\n"
-					"mov r10, arg_count\n"
+					"mov r12, arg_count\n"
 					for_fix_stack":\n"
-					"cmp r10, "(number->string (length args)) "\n"
+					"cmp r12, "(number->string (length args)) "\n"
 					"je " end_of_fix_stack "\n"
 					"mov rdi, 8\n"
 					"call malloc\n"			
 					"mov rdx, rbp\n"				
 					"add rdx, 4*8\n"	
 					"\t ;stack fixer \n"			
-					"mov r11, r10\n"				
+					"mov r11, r12\n"				
 					"dec r11\n"
 					"shl r11, 3\n"							
 					"add rdx, r11\n"				
@@ -687,7 +687,7 @@
 					"\t ;;rax <- target, rbx <- cdr, rcx <- car \n"
 					"mov rbx, rax\n"
 					"push rax\n"				
-					"dec r10\n"		
+					"dec r12\n"		
 					"pop rax\n"			
 					"jmp " for_fix_stack "\n"
 					
@@ -866,10 +866,10 @@
 	            "mov rbx, arg_count\n"
 	            "cmp rbx, 1\n"
 	 			"jne "low_case"_exit\n"
-	            "mov r10, An(0)\n"
-	            "mov r10, [r10]\n"
-	            "TYPE r10\n"
-	            "cmp r10, T_"var_type"\n"
+	            "mov r12, An(0)\n"
+	            "mov r12, [r12]\n"
+	            "TYPE r12\n"
+	            "cmp r12, T_"var_type"\n"
 	            "jne "low_case"_not\n"
 	            "mov rax, const_3\n" 
 	            "jmp "low_case"_finish\n"
@@ -1203,15 +1203,15 @@
 	        "cmp rbx, T_FRACTION\n"
 	        "jne bin_equal_false\n"
 
-	        "mov r8, rcx\n"
-	        "mov r9, rdx\n"
+	        "mov r9, rcx\n"
+	        "mov r8, rdx\n"
 	        "CAR rcx\n"
 	        "CAR rdx\n"
 	        "cmp rcx, rdx\n"
 	        "jne bin_equal_false\n"
-	        "CDR r8\n"
 	        "CDR r9\n"
-	        "cmp r8, r9\n"
+	        "CDR r8\n"
+	        "cmp r9, r8\n"
 	        "jne bin_equal_false\n"
 	        "mov rax, const_3\n"
 	        "jmp bin_equal_finish\n"
@@ -1256,9 +1256,9 @@
       		"TYPE rcx\n"
       		"cmp rcx, T_INTEGER\n"
       		"jne bin_plus_arg1_frac_arg2_frac\n"
-      		"mov r10, rax\n"
+      		"mov r12, rax\n"
       		"mov rax, rbx\n"
-      		"mov rbx, r10\n"
+      		"mov rbx, r12\n"
       		"jmp bin_plus_arg1_int_arg2_frac\n"
       
       		"bin_plus_arg1_frac_arg2_frac:\n"
@@ -1269,20 +1269,20 @@
       		"CDR r11\n"
       		"DATA r11\n"
       
-     		"mov r10, rbx\n"					
-      		"CAR r10\n"
-      		"DATA r10\n"					;r10 holds arg2 numerator
-      		"mov r12, rbx\n"				;r12 keeps r10 value
-      		"CDR r12\n"
-      		"DATA r12\n"
-      		"mov r8, r11\n"					;backup first denominator
+     		"mov r12, rbx\n"					
+      		"CAR r12\n"
+      		"DATA r12\n"					;r12 holds arg2 numerator
+      		"mov r10, rbx\n"				;r10 keeps r12 value
+      		"CDR r10\n"
+      		"DATA r10\n"
+      		"mov r9, r11\n"					;backup first denominator
 
-      		"MULT r11, r12\n"				;now r11 holds arg1 denominator * arg2 denominator
-      		"MULT rcx, r12\n"				;now rcx holds arg1 numerator * arg2 denominator
-      		"MULT r10, r8\n"				;now r10 holds second numerator * arg1 denominator
-      		"add rcx, r10\n"
+      		"MULT r11, r10\n"				;now r11 holds arg1 denominator * arg2 denominator
+      		"MULT rcx, r10\n"				;now rcx holds arg1 numerator * arg2 denominator
+      		"MULT r12, r9\n"				;now r12 holds second numerator * arg1 denominator
+      		"add rcx, r12\n"
       		"mov rax, rcx\n"	
-      		"mov r12, r11\n"					
+      		"mov r10, r11\n"					
       		"jmp bin_plus_simplify_and_create_fraction\n"                                             
       		
 		  	"bin_plus_arg1_int_check_arg2:\n"
@@ -1294,25 +1294,25 @@
 		  	"je bin_plus_arg1_int_arg2_int\n"
 
 		  	"bin_plus_arg1_int_arg2_frac:\n"
-		  	"mov r10, rbx\n"
-		  	"CAR r10\n"
-		  	"DATA r10\n";we will put in r10 second_numerator
 		  	"mov r12, rbx\n"
-		  	"CDR r12\n"
-		  	"DATA r12\n";we will put in r12 second_denominator
-		  	"mov r8,rax\n"
-		  	"DATA r8\n"
-		  	"MULT r8,r12\n"
-		  	"mov rax,r8\n";now rax holds first_numerator*second_denominator
-		  	"add rax,r10\n"
+		  	"CAR r12\n"
+		  	"DATA r12\n";we will put in r12 second_numerator
+		  	"mov r10, rbx\n"
+		  	"CDR r10\n"
+		  	"DATA r10\n";we will put in r10 second_denominator
+		  	"mov r9,rax\n"
+		  	"DATA r9\n"
+		  	"MULT r9,r10\n"
+		  	"mov rax,r9\n";now rax holds first_numerator*second_denominator
+		  	"add rax,r12\n"
 
 		  	;rax holds new numerator
-		  	;r12 holds new denominator
+		  	;r10 holds new denominator
 		  	"bin_plus_simplify_and_create_fraction:\n"
-		  	"mov r8,  rax\n"
-		  	"mov r9, r12\n"
-		  	"push r9\n"
+		  	"mov r9,  rax\n"
+		  	"mov r8, r10\n"
 		  	"push r8\n"
+		  	"push r9\n"
 		  	"call simplify_fraction\n"
 		  	"add rsp, 16\n"
 		  	"jmp bin_plus_create_new_fraction\n"
@@ -1332,25 +1332,25 @@
 		  	"jmp bin_plus_finish\n"                     
                     
 		  	"bin_plus_create_new_fraction:\n"
-		  	"cmp r9, 1\n"
+		  	"cmp r8, 1\n"
 		  	"je bin_plus_create_new_int\n"
 
-		  	"shl r8, 4\n"
-		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
 		  	"shl r9, 4\n"
-		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		  	"or r9, T_INTEGER\n"		;r9 holds numerator in data structure
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds denominator in data structure
 		    
 		    "mov rdi, 8\n"
 		    "call malloc\n"
 		    "mov rbx, rax\n"
-		    "mov [rbx], r8\n"
+		    "mov [rbx], r9\n"
 		    "push rbx\n"
 
 		    "mov rdi, 8\n"
 		    "call malloc\n"
 		    "pop rbx\n"
 		    "mov rcx, rax\n"
-		    "mov [rcx], r9\n"
+		    "mov [rcx], r8\n"
 		    "push rbx\n"
 		    "push rcx\n"
 
@@ -1364,14 +1364,14 @@
 		          
 		   	"bin_plus_create_new_int:\n"
 
-		   	"shl r8, 4\n"
-		  	"or r8, T_INTEGER\n"
-		  	"push r8\n"
+		   	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"
+		  	"push r9\n"
 
 		  	"mov rdi, 8\n"
 		    "call malloc\n"
-		    "pop r8\n"
-		    "mov [rax], r8\n"
+		    "pop r9\n"
+		    "mov [rax], r9\n"
           
 	        "bin_plus_finish:\n"
 	        "leave\n"
@@ -1419,20 +1419,20 @@
       		"CDR r11\n"
       		"DATA r11\n"
       
-     		"mov r10, rbx\n"					
-      		"CAR r10\n"
-      		"DATA r10\n"					;r10 holds arg2 numerator
-      		"mov r12, rbx\n"				;r12 keeps r10 value
-      		"CDR r12\n"
-      		"DATA r12\n"
-      		"mov r8, r11\n"					;backup first denominator
+     		"mov r12, rbx\n"					
+      		"CAR r12\n"
+      		"DATA r12\n"					;r12 holds arg2 numerator
+      		"mov r10, rbx\n"				;r10 keeps r12 value
+      		"CDR r10\n"
+      		"DATA r10\n"
+      		"mov r9, r11\n"					;backup first denominator
 
-      		"MULT r11, r12\n"				;now r11 holds arg1 denominator * arg2 denominator
-      		"MULT rcx, r12\n"				;now rcx holds arg1 numerator * arg2 denominator
-      		"MULT r10, r8\n"				;now r10 holds second numerator * arg1 denominator
-      		"sub rcx, r10\n"
+      		"MULT r11, r10\n"				;now r11 holds arg1 denominator * arg2 denominator
+      		"MULT rcx, r10\n"				;now rcx holds arg1 numerator * arg2 denominator
+      		"MULT r12, r9\n"				;now r12 holds second numerator * arg1 denominator
+      		"sub rcx, r12\n"
       		"mov rax, rcx\n"	
-      		"mov r12, r11\n"					
+      		"mov r10, r11\n"					
       		"jmp bin_minus_simplify_and_create_fraction\n"                                             
       		
 		  	"bin_minus_arg1_int_check_arg2:\n"
@@ -1444,40 +1444,40 @@
 		  	"je bin_minus_arg1_int_arg2_int\n"
 
 		  	"bin_minus_arg1_int_arg2_frac:\n"
-		  	"mov r10, rbx\n"
-		  	"CAR r10\n"
-		  	"DATA r10\n";we will put in r10 second_numerator
 		  	"mov r12, rbx\n"
-		  	"CDR r12\n"
-		  	"DATA r12\n";we will put in r12 second_denominator
-		  	"mov r8,rax\n"
-		  	"DATA r8\n"
-		  	"MULT r8,r12\n"
-		  	"mov rax,r8\n";now rax holds first_numerator*second_denominator
-		  	"sub rax,r10\n"
+		  	"CAR r12\n"
+		  	"DATA r12\n";we will put in r12 second_numerator
+		  	"mov r10, rbx\n"
+		  	"CDR r10\n"
+		  	"DATA r10\n";we will put in r10 second_denominator
+		  	"mov r9,rax\n"
+		  	"DATA r9\n"
+		  	"MULT r9,r10\n"
+		  	"mov rax,r9\n";now rax holds first_numerator*second_denominator
+		  	"sub rax,r12\n"
 		  	"jmp bin_minus_simplify_and_create_fraction\n"
 
 		  	"bin_minus_arg1_frac_arg2_int:\n"
-		  	"mov r10, rax\n"
-		  	"CAR r10\n"
-		  	"DATA r10\n"
 		  	"mov r12, rax\n"
-		  	"CDR r12\n"
+		  	"CAR r12\n"
 		  	"DATA r12\n"
-		  	"mov r8,rbx\n"
-		  	"DATA r8\n"
-		  	"MULT r8,r12\n"
-		  	"mov rax,r8\n";now rax holds first_numerator*second_denominator
-		  	"sub r10, rax\n"
-		  	"mov rax, r10\n"
+		  	"mov r10, rax\n"
+		  	"CDR r10\n"
+		  	"DATA r10\n"
+		  	"mov r9,rbx\n"
+		  	"DATA r9\n"
+		  	"MULT r9,r10\n"
+		  	"mov rax,r9\n";now rax holds first_numerator*second_denominator
+		  	"sub r12, rax\n"
+		  	"mov rax, r12\n"
 
 		  	;rax holds new numerator
-		  	;r12 holds new denominator
+		  	;r10 holds new denominator
 		  	"bin_minus_simplify_and_create_fraction:\n"
-		  	"mov r8,  rax\n"
-		  	"mov r9, r12\n"
-		  	"push r9\n"
+		  	"mov r9,  rax\n"
+		  	"mov r8, r10\n"
 		  	"push r8\n"
+		  	"push r9\n"
 		  	"call simplify_fraction\n"
 		  	"add rsp, 16\n"
 		  	"jmp bin_minus_create_new_fraction\n"
@@ -1486,37 +1486,37 @@
 		  	"DATA rbx\n" 
 		  	"DATA rax\n"      
 		  	"sub rax, rbx\n"
-		  	"mov r10, rax\n"
-		  	"shl r10, 4\n"
-		  	"or r10, T_INTEGER\n"
-		  	"push r10\n"
+		  	"mov r12, rax\n"
+		  	"shl r12, 4\n"
+		  	"or r12, T_INTEGER\n"
+		  	"push r12\n"
 		  	"mov rdi, 8\n"
 		  	"call malloc\n"
-		  	"pop r10\n"
-		  	"mov [rax],r10\n"
+		  	"pop r12\n"
+		  	"mov [rax],r12\n"
 		                        
 		  	"jmp bin_minus_finish\n"                     
                     
 		  	"bin_minus_create_new_fraction:\n"
-		  	"cmp r9, 1\n"
+		  	"cmp r8, 1\n"
 		  	"je bin_minus_create_new_int\n"
 
-		  	"shl r8, 4\n"
-		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
 		  	"shl r9, 4\n"
-		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		  	"or r9, T_INTEGER\n"		;r9 holds numerator in data structure
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds denominator in data structure
 		    
 		    "mov rdi, 8\n"
 		    "call malloc\n"
 		    "mov rbx, rax\n"
-		    "mov [rbx], r8\n"
+		    "mov [rbx], r9\n"
 		    "push rbx\n"
 
 		    "mov rdi, 8\n"
 		    "call malloc\n"
 		    "pop rbx\n"
 		    "mov rcx, rax\n"
-		    "mov [rcx], r9\n"
+		    "mov [rcx], r8\n"
 		    "push rbx\n"
 		    "push rcx\n"
 
@@ -1530,14 +1530,14 @@
 		          
 		   	"bin_minus_create_new_int:\n"
 
-		   	"shl r8, 4\n"
-		  	"or r8, T_INTEGER\n"
-		  	"push r8\n"
+		   	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"
+		  	"push r9\n"
 
 		  	"mov rdi, 8\n"
 		    "call malloc\n"
-		    "pop r8\n"
-		    "mov [rax], r8\n"
+		    "pop r9\n"
+		    "mov [rax], r9\n"
           
 	        "bin_minus_finish:\n"
 	        "leave\n"
@@ -1576,9 +1576,9 @@
       		"TYPE rcx\n"
       		"cmp rcx, T_INTEGER\n"
       		"jne bin_mul_arg1_frac_arg2_frac\n"
-      		"mov r10, rax\n"
+      		"mov r12, rax\n"
       		"mov rax, rbx\n"
-      		"mov rbx, r10\n"
+      		"mov rbx, r12\n"
       		"jmp bin_mul_arg1_int_arg2_frac\n"
       
       		"bin_mul_arg1_frac_arg2_frac:\n"
@@ -1589,18 +1589,18 @@
       		"CDR r11\n"
       		"DATA r11\n"
       
-     		"mov r10, rbx\n"					
-      		"CAR r10\n"
-      		"DATA r10\n"					;r10 holds arg2 numerator
-      		"mov r12, rbx\n"				;r12 keeps r10 value
-      		"CDR r12\n"
-      		"DATA r12\n"
-      		"mov r8, r11\n"					;backup first denominator
+     		"mov r12, rbx\n"					
+      		"CAR r12\n"
+      		"DATA r12\n"					;r12 holds arg2 numerator
+      		"mov r10, rbx\n"				;r10 keeps r12 value
+      		"CDR r10\n"
+      		"DATA r10\n"
+      		"mov r9, r11\n"					;backup first denominator
 
-      		"MULT r11, r12\n"				;now r11 holds arg1 denominator * arg2 denominator
-      		"MULT r10, rcx\n"				;now r10 holds arg1 numerator * arg2 numerator
-      		"mov rax, r10\n"	
-      		"mov r12, r11\n"					
+      		"MULT r11, r10\n"				;now r11 holds arg1 denominator * arg2 denominator
+      		"MULT r12, rcx\n"				;now r12 holds arg1 numerator * arg2 numerator
+      		"mov rax, r12\n"	
+      		"mov r10, r11\n"					
       		"jmp bin_mul_simplify_and_create_fraction\n"                                             
       		
 		  	"bin_mul_arg1_int_check_arg2:\n"
@@ -1612,25 +1612,25 @@
 		  	"je bin_mul_arg1_int_arg2_int\n"
 
 		  	"bin_mul_arg1_int_arg2_frac:\n"
-		  	"mov r10, rbx\n"
-		  	"CAR r10\n"
-		  	"DATA r10\n";we will put in r10 second_numerator
 		  	"mov r12, rbx\n"
-		  	"CDR r12\n"
-		  	"DATA r12\n";we will put in r12 second_denominator
-		  	"mov r8,rax\n"
-		  	"DATA r8\n"
-		  	"MULT r8,r10\n"
+		  	"CAR r12\n"
+		  	"DATA r12\n";we will put in r12 second_numerator
+		  	"mov r10, rbx\n"
+		  	"CDR r10\n"
+		  	"DATA r10\n";we will put in r10 second_denominator
+		  	"mov r9,rax\n"
+		  	"DATA r9\n"
+		  	"MULT r9,r12\n"
 		  	
-		  	"mov rax,r8\n";now rax holds first_numerator*second_numerator
+		  	"mov rax,r9\n";now rax holds first_numerator*second_numerator
 
 		  	;rax holds new numerator
-		  	;r12 holds new denominator
+		  	;r10 holds new denominator
 		  	"bin_mul_simplify_and_create_fraction:\n"
-		  	"mov r8,  rax\n"
-		  	"mov r9, r12\n"
-		  	"push r9\n"
+		  	"mov r9,  rax\n"
+		  	"mov r8, r10\n"
 		  	"push r8\n"
+		  	"push r9\n"
 		  	"call simplify_fraction\n"
 		  	"add rsp, 16\n"
 		  	"jmp bin_mul_create_new_fraction\n"
@@ -1638,8 +1638,8 @@
 		  	"bin_mul_arg1_int_arg2_int:\n"
 		  	"DATA rbx\n" 
 		  	"DATA rax\n"
-		  	"mov r10, rax\n"     
-		  	"MULT rbx,r10\n"
+		  	"mov r12, rax\n"     
+		  	"MULT rbx,r12\n"
 		  	"shl rbx, 4\n"
 		  	"or rbx, T_INTEGER\n"
 		  	"push rbx\n"
@@ -1651,25 +1651,25 @@
 		  	"jmp bin_mul_finish\n"                     
                     
 		  	"bin_mul_create_new_fraction:\n"
-		  	"cmp r9, 1\n"
+		  	"cmp r8, 1\n"
 		  	"je bin_mul_create_new_int\n"
 
-		  	"shl r8, 4\n"
-		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
 		  	"shl r9, 4\n"
-		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		  	"or r9, T_INTEGER\n"		;r9 holds numerator in data structure
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds denominator in data structure
 		    
 		    "mov rdi, 8\n"
 		    "call malloc\n"
 		    "mov rbx, rax\n"
-		    "mov [rbx], r8\n"
+		    "mov [rbx], r9\n"
 		    "push rbx\n"
 
 		    "mov rdi, 8\n"
 		    "call malloc\n"
 		    "pop rbx\n"
 		    "mov rcx, rax\n"
-		    "mov [rcx], r9\n"
+		    "mov [rcx], r8\n"
 		    "push rbx\n"
 		    "push rcx\n"
 
@@ -1683,14 +1683,14 @@
 		          
 		   	"bin_mul_create_new_int:\n"
 
-		   	"shl r8, 4\n"
-		  	"or r8, T_INTEGER\n"
-		  	"push r8\n"
+		   	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"
+		  	"push r9\n"
 
 		  	"mov rdi, 8\n"
 		    "call malloc\n"
-		    "pop r8\n"
-		    "mov [rax], r8\n"
+		    "pop r9\n"
+		    "mov [rax], r9\n"
           
 	        "bin_mul_finish:\n"
 	        "leave\n"
@@ -1738,23 +1738,23 @@
       		"CDR r11\n"
       		"DATA r11\n"
       
-     		"mov r10, rbx\n"					
-      		"CAR r10\n"
-      		"DATA r10\n"					;r10 holds arg2 numerator
-      		"mov r12, rbx\n"				;r12 keeps r10 value
-      		"CDR r12\n"
-      		"DATA r12\n"
-      		"mov r8, r11\n"					;backup first denominator
+     		"mov r12, rbx\n"					
+      		"CAR r12\n"
+      		"DATA r12\n"					;r12 holds arg2 numerator
+      		"mov r10, rbx\n"				;r10 keeps r12 value
+      		"CDR r10\n"
+      		"DATA r10\n"
+      		"mov r9, r11\n"					;backup first denominator
 
-      		"MULT rcx, r12\n"				;now rcx holds arg1 numerator * arg2 denominator
-      		"MULT r11, r10\n"				;now r11 holds arg1 denominator * arg2 numerator
+      		"MULT rcx, r10\n"				;now rcx holds arg1 numerator * arg2 denominator
+      		"MULT r11, r12\n"				;now r11 holds arg1 denominator * arg2 numerator
       		"cmp r11, 0\n"
 		  	"jg bin_div_positive_int1\n"
 		  	"neg r11\n"
 		  	"neg rcx\n"
 		  	"bin_div_positive_int1:\n"
       		"mov rax, rcx\n"	
-      		"mov r12, r11\n"					
+      		"mov r10, r11\n"					
       		"jmp bin_div_simplify_and_create_fraction\n"                                             
       		
 		  	"bin_div_arg1_int_check_arg2:\n"
@@ -1766,52 +1766,52 @@
 		  	"je bin_div_arg1_int_arg2_int\n"
 
 		  	"bin_div_arg1_int_arg2_frac:\n"
-		  	"mov r10, rbx\n"
-		  	"CAR r10\n"
-		  	"DATA r10\n";we will put in r10 second_numerator
 		  	"mov r12, rbx\n"
-		  	"CDR r12\n"
-		  	"DATA r12\n";we will put in r12 second_denominator
-		  	"mov r8,rax\n"
-		  	"DATA r8\n"
-		  	"MULT r8,r12\n"
-		  	"cmp r10, 0\n"
+		  	"CAR r12\n"
+		  	"DATA r12\n";we will put in r12 second_numerator
+		  	"mov r10, rbx\n"
+		  	"CDR r10\n"
+		  	"DATA r10\n";we will put in r10 second_denominator
+		  	"mov r9,rax\n"
+		  	"DATA r9\n"
+		  	"MULT r9,r10\n"
+		  	"cmp r12, 0\n"
 		  	"jg bin_div_positive_int2\n"
-		  	"neg r10\n"
-		  	"neg r8\n"
+		  	"neg r12\n"
+		  	"neg r9\n"
 		  	"bin_div_positive_int2:\n"
-		  	"mov r12, r10\n"
-		  	"mov rax,r8\n"
+		  	"mov r10, r12\n"
+		  	"mov rax,r9\n"
 		  	"jmp bin_div_simplify_and_create_fraction\n"
 
 		  	"bin_div_arg1_frac_arg2_int:\n"
-		  	"mov r10, rax\n"
-		  	"CAR r10\n"
-		  	"DATA r10\n"
 		  	"mov r12, rax\n"
-		  	"CDR r12\n"
+		  	"CAR r12\n"
 		  	"DATA r12\n"
-		  	"mov r8,rbx\n"
-		  	"DATA r8\n"
-		  	"MULT r8,r12\n"
-		  	"cmp r8, 0\n"
+		  	"mov r10, rax\n"
+		  	"CDR r10\n"
+		  	"DATA r10\n"
+		  	"mov r9,rbx\n"
+		  	"DATA r9\n"
+		  	"MULT r9,r10\n"
+		  	"cmp r9, 0\n"
 		  	"jg bin_div_positive_int3\n"
-		  	"neg r8\n"
-		  	"neg r10\n"
+		  	"neg r9\n"
+		  	"neg r12\n"
 		  	"bin_div_positive_int3:\n"
-		  	"mov rax,r8\n";now rax holds first_denominator*second_denominator
+		  	"mov rax,r9\n";now rax holds first_denominator*second_denominator
 		  	"mov r11, rax\n"
-		  	"mov rax, r10\n"
-		  	"mov r12, r11\n"
+		  	"mov rax, r12\n"
+		  	"mov r10, r11\n"
 
 
 		  	;rax holds new numerator
-		  	;r12 holds new denominator
+		  	;r10 holds new denominator
 		  	"bin_div_simplify_and_create_fraction:\n"
-		  	"mov r8,  rax\n"
-		  	"mov r9, r12\n"
-		  	"push r9\n"
+		  	"mov r9,  rax\n"
+		  	"mov r8, r10\n"
 		  	"push r8\n"
+		  	"push r9\n"
 		  	"call simplify_fraction\n"
 		  	"add rsp, 16\n"
 		  	"jmp bin_div_create_new_fraction\n"
@@ -1819,34 +1819,34 @@
 		  	"bin_div_arg1_int_arg2_int:\n"
 		  	"DATA rax\n"
 		  	"DATA rbx\n"
-		  	"mov r12, rbx\n"
-		  	"cmp r12, 0\n"
+		  	"mov r10, rbx\n"
+		  	"cmp r10, 0\n"
 		  	"jg bin_div_positive_int4\n"
-		  	"neg r12\n"
+		  	"neg r10\n"
 		  	"neg rax\n"
 		  	"bin_div_positive_int4:\n" 
 		  	"jmp bin_div_simplify_and_create_fraction\n"
 		                                
 		  	"bin_div_create_new_fraction:\n"
-		  	"cmp r9, 1\n"
+		  	"cmp r8, 1\n"
 		  	"je bin_div_create_new_int\n"
 
-		  	"shl r8, 4\n"
-		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
 		  	"shl r9, 4\n"
-		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		  	"or r9, T_INTEGER\n"		;r9 holds numerator in data structure
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds denominator in data structure
 		    
 		    "mov rdi, 8\n"
 		    "call malloc\n"
 		    "mov rbx, rax\n"
-		    "mov [rbx], r8\n"
+		    "mov [rbx], r9\n"
 		    "push rbx\n"
 
 		    "mov rdi, 8\n"
 		    "call malloc\n"
 		    "pop rbx\n"
 		    "mov rcx, rax\n"
-		    "mov [rcx], r9\n"
+		    "mov [rcx], r8\n"
 		    "push rbx\n"
 		    "push rcx\n"
 
@@ -1860,14 +1860,14 @@
 		          
 		   	"bin_div_create_new_int:\n"
 
-		   	"shl r8, 4\n"
-		  	"or r8, T_INTEGER\n"
-		  	"push r8\n"
+		   	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"
+		  	"push r9\n"
 
 		  	"mov rdi, 8\n"
 		    "call malloc\n"
-		    "pop r8\n"
-		    "mov [rax], r8\n"
+		    "pop r9\n"
+		    "mov [rax], r9\n"
           
 	        "bin_div_finish:\n"
 	        "leave\n"
@@ -2144,7 +2144,7 @@
 	 		"mov rcx, rax\n"
 	 		"mov rbx, An(1)\n"
 	 		"mov rbx, [rbx]\n"
-	 		"mov r10, rbx\n"
+	 		"mov r12, rbx\n"
 	 		"TYPE rcx\n"
 	        "cmp rcx, T_INTEGER\n"
 	        "jne remainder_finish\n"
@@ -2152,17 +2152,17 @@
 	        "cmp rbx, T_INTEGER\n"
 	        "jne remainder_finish\n"
 	        "DATA rax\n"
-	        "mov r9, rax\n"
-	        "DATA r10\n"
+	        "mov r8, rax\n"
+	        "DATA r12\n"
 	        "mov rdx, qword 0\n"
 	      
-	        "cmp r9, 0\n"
+	        "cmp r8, 0\n"
 	        "jge is_not_negative1\n"
 	        "neg rax\n"
 	        "is_not_negative1:\n"
 	        "mov rdx, qword 0\n"
-	        "idiv r10\n"
-	        "cmp r9, 0\n"
+	        "idiv r12\n"
+	        "cmp r8, 0\n"
 	        "jge is_not_negative2\n"
 	        "neg rdx\n"
 	        "is_not_negative2:\n"
@@ -2373,9 +2373,9 @@
 	        "mov rdx, r11\n"
 	        "DATA rdx\n"
 
-	       	"mov r10, An(2)\n" ;char
-	        "mov r10, [r10]\n"
-	        "mov rcx, r10\n"
+	       	"mov r12, An(2)\n" ;char
+	        "mov r12, [r12]\n"
+	        "mov rcx, r12\n"
 	        "DATA rcx\n"
 
 	        "TYPE rax\n"
@@ -2386,13 +2386,13 @@
 	        "cmp r11, T_INTEGER\n"
 	        "jne string_set_finish\n"
 
-	       	"TYPE r10\n"
-	        "cmp r10, T_CHAR\n"
+	       	"TYPE r12\n"
+	        "cmp r12, T_CHAR\n"
 	        "jne string_set_finish\n"
 
 	        ;rbx=string, rdx=index, rcx=char
 
-	        "mov r12, rbx\n"
+	        "mov r10, rbx\n"
 	        "STRING_ELEMENTS rbx\n"
 			"add rbx, rdx\n"
 			"mov byte [rbx], cl\n"
@@ -2442,9 +2442,9 @@
 
 	        ;rbx=vector, rdx=index, rcx=item
 
-	        "mov r12, rbx\n"
-	        "VECTOR_ELEMENTS r12\n"
-	        "mov [r12 + rdx*8], rcx\n"
+	        "mov r10, rbx\n"
+	        "VECTOR_ELEMENTS r10\n"
+	        "mov [r10 + rdx*8], rcx\n"
 
 	        "mov rax, const_1\n"
 
@@ -2467,8 +2467,8 @@
         	"push rbp\n"
 			"mov rbp, rsp\n"
 			"mov rdx, qword 0\n" ;initialize char with 0         
-            "mov r9, arg_count\n"
-	        "cmp r9, 2\n"
+            "mov r8, arg_count\n"
+	        "cmp r8, 2\n"
 	 		"jg make_string_finish\n"
 
 	 		"mov rax, An(0)\n" ;length of string	        
@@ -2480,7 +2480,7 @@
 	        "cmp rax, T_INTEGER\n"
 	        "jne make_string_finish\n"
 
-	        "cmp r9, 1\n"
+	        "cmp r8, 1\n"
 	        "je start_creating_string\n"
 
 	        "mov rcx, An(1)\n" ;char
@@ -2503,13 +2503,13 @@
 
  
 	        ;rax= pointer to address of rbx bytes, rbx=length of string, rdx=char
-	        "mov r10, 0\n" ;counter
+	        "mov r12, 0\n" ;counter
 
 	        "for_create_string:\n"
-	        "cmp r10, rbx\n"
+	        "cmp r12, rbx\n"
 	        "je end_of_create_string\n"
-	        "mov byte [rax+r10], dl\n"
-	        "inc r10\n"
+	        "mov byte [rax+r12], dl\n"
+	        "inc r12\n"
 	        "jmp for_create_string\n"
 	        "end_of_create_string:\n"
 
@@ -2563,8 +2563,8 @@
 	        "cmp rax, T_INTEGER\n"
 	        "jne make_vector_finish\n"
 
-	        "mov r9, arg_count\n"
-	        "cmp r9, 1\n"
+	        "mov r8, arg_count\n"
+	        "cmp r8, 1\n"
 	        "je start_creating_vector\n"
 	        "mov rdx, An(1)\n" ; address of item
 
@@ -2579,13 +2579,13 @@
 	        "pop rbx\n"
  
 	        ;rax= pointer to address of rbx*8 bytes, rbx=length of vector, rdx=address of item
-	        "mov r10, 0\n" ;counter
+	        "mov r12, 0\n" ;counter
 
 	        "for_create_vector:\n"
-	        "cmp r10, rbx\n"
+	        "cmp r12, rbx\n"
 	        "je end_of_create_vector\n"
-	        "mov qword [rax+r10*8], rdx\n"
-	        "inc r10\n"
+	        "mov qword [rax+r12*8], rdx\n"
+	        "inc r12\n"
 	        "jmp for_create_vector\n"
 	        "end_of_create_vector:\n"
 
@@ -2626,14 +2626,14 @@
 	        "pop rbx\n"
  
 	        ;rax= pointer to address of rbx*8 bytes, rbx=length of vector
-	        "mov r10, 0\n" ;counter
+	        "mov r12, 0\n" ;counter
 	        "for_vector:\n"
-	        "cmp r10, rbx\n"
+	        "cmp r12, rbx\n"
 	        "je end_of_vector\n"
 
-	        "mov rdx, An(r10)\n" 
-	        "mov qword [rax+r10*8], rdx\n"
-	        "inc r10\n"
+	        "mov rdx, An(r12)\n" 
+	        "mov qword [rax+r12*8], rdx\n"
+	        "inc r12\n"
 	        "jmp for_vector\n"
 	        "end_of_vector:\n"
 
@@ -2667,10 +2667,10 @@
             "mov rbp, rsp\n"
 	        "mov rax, An(0)\n"				;closure
 	        "mov rax, qword [rax]\n"
-	        "mov r10, qword [rbp]\n" 		;old rbp
+	        "mov r12, qword [rbp]\n" 		;old rbp
 	        "mov r11,qword [rbp+8]\n" 		;ret addr
-	        "mov r12, rbp\n"
-	        "add r12, 5*8\n"
+	        "mov r10, rbp\n"
+	        "add r10, 5*8\n"
 	        
 	        "mov rbx, rax\n" 
 	        "TYPE rbx\n"
@@ -2701,7 +2701,7 @@
 
 	        "apply_calculate_list_length_done:\n"
 	        "shl rsi, 3\n"
-	        "sub r12, rsi\n"
+	        "sub r10, rsi\n"
 	        "shr rsi, 3\n"
 	        
 	        "mov rdi, 0\n"
@@ -2715,23 +2715,23 @@
 	        "mov rbx, rcx\n"
 	        "DATA_UPPER rbx\n"
 			"add rbx, start_of_data\n"    
-	        "mov qword [r12 + 8*rdi], rbx\n"
+	        "mov qword [r10 + 8*rdi], rbx\n"
 	        "CDR rcx\n"
 	        "inc rdi\n"
 	        "jmp apply_loop\n"
 	        
 	        "apply_loop_exit:\n"
 
-	        "sub r12, 8\n"
-	        "mov qword [r12],rsi\n"
-	        "sub r12, 8\n"
+	        "sub r10, 8\n"
+	        "mov qword [r10],rsi\n"
+	        "sub r10, 8\n"
 	        "mov rbx, rax\n"
 	        "CLOSURE_ENV rbx\n"
-	        "mov qword [r12], rbx\n"
-	        "sub r12, 8\n"
-	        "mov qword [r12], r11\n"
-	        "mov rsp, r12\n"	        
-	        "mov rbp, r10\n"
+	        "mov qword [r10], rbx\n"
+	        "sub r10, 8\n"
+	        "mov qword [r10], r11\n"
+	        "mov rsp, r10\n"	        
+	        "mov rbp, r12\n"
 	        "mov rbx, rax\n"
 	        "TYPE rbx\n"
 	        
@@ -2789,35 +2789,35 @@
 	   tab "mov rbp, rsp" newLine
 	   tab "mov r11, An(0)" newLine ;r11= pointer to arg
 	   
-	   tab "mov r10, [symbol_table]" newLine		
-	   tab "cmp r10, const_2" newLine
+	   tab "mov r12, [symbol_table]" newLine		
+	   tab "cmp r12, const_2" newLine
 	   tab "je string_to_symbol_create_symbol" newLine
     		
 	   "string_to_symbol_loop:" newLine
-	   tab "mov r12, r10" newLine
-	   tab "mov r12, [r12]" newLine
-	   tab "DATA_UPPER r12" newLine
-	   tab "add r12 , start_of_data" newLine
-	   tab "mov r12, [r12]" newLine
-	   tab "DATA r12" newLine
-	   tab "add r12 , start_of_data" newLine
-	   tab "STRING_COMPARE r12, r11" newLine
+	   tab "mov r10, r12" newLine
+	   tab "mov r10, [r10]" newLine
+	   tab "DATA_UPPER r10" newLine
+	   tab "add r10 , start_of_data" newLine
+	   tab "mov r10, [r10]" newLine
+	   tab "DATA r10" newLine
+	   tab "add r10 , start_of_data" newLine
+	   tab "STRING_COMPARE r10, r11" newLine
 	   tab "cmp rax, const_3" newLine 
 	   tab "je string_to_symbol_found" newLine
 	   newLine
-	   tab "mov r10, [r10]" newLine
-	   tab "DATA_LOWER r10" newLine
-	   tab "add r10, start_of_data" newLine
-	   tab "cmp r10, const_2" newLine
+	   tab "mov r12, [r12]" newLine
+	   tab "DATA_LOWER r12" newLine
+	   tab "add r12, start_of_data" newLine
+	   tab "cmp r12, const_2" newLine
 	   tab "je string_to_symbol_create_symbol" newLine
 	   newLine
 	   tab "jmp string_to_symbol_loop" newLine
 	   newLine         
 	   "string_to_symbol_found:" newLine
-	   tab "mov r10, [r10]" newLine
-	   tab "DATA_UPPER r10" newLine
-	   tab "add r10, start_of_data" newLine
-	   tab "mov rax, r10" newLine
+	   tab "mov r12, [r12]" newLine
+	   tab "DATA_UPPER r12" newLine
+	   tab "add r12, start_of_data" newLine
+	   tab "mov rax, r12" newLine
 	   tab "jmp string_to_symbol_finish" newLine
 	   newLine
 	   tab "string_to_symbol_create_symbol:" newLine
