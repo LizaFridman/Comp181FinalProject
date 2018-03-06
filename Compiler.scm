@@ -479,9 +479,9 @@
 (define cg-T-symbol
   (lambda (stringIndex index)
       (string-append (make-const-label index)
-		     tab "MAKE_LITERAL_SYMBOL " (string-append
+		     tab "dq MAKE_LITERAL_SYMBOL (" (string-append
 						const-label
-						(number->string stringIndex))
+						(number->string stringIndex)) ")"
 		     newLine)))
 
 (define cg-T-pair
@@ -630,7 +630,7 @@
 			""
 			(string-append 
 			symbol-label (number->string indx) ": \n"
-			"MAKE_LITERAL_SYMBOL " (string-append const-label (number->string (c-table-contains? c-table (symbol->string (car lst))))) "\n" 
+			"dq MAKE_LITERAL_SYMBOL (" (string-append const-label (number->string (c-table-contains? c-table (symbol->string (car lst))))) ")\n" 
 			(symb-table-make-func (cdr lst) (+ 1 indx))
 			))
 		))
@@ -1353,8 +1353,8 @@
 		   tab "PUSH L_exit" newLine
 		   tab "push rbp" newLine
 		   tab "mov rbp, rsp" newLine
-		   (master-symbol-builder ct)
-		   "mov [SymbolTable], rax \n"
+		;   (master-symbol-builder ct)
+		 ;  "mov [SymbolTable], rax \n"
 		   newLine
 		   (cg-built-in)
 		   ;;(cg-built-in-closures (filter (lambda (row)
