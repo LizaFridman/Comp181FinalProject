@@ -2,481 +2,80 @@
 (load "project/tag-parser.scm")
 (load "project/semantic-analyzer.scm")
 
-(define first
-  (lambda (lst)
-    (car lst)))
-
-(define second
-  (lambda (lst)
-    (cadr lst)))
-
-(define third
-  (lambda (lst)
-    (caddr lst)))
-
-(define forth
-  (lambda (lst)
-    (cadddr lst)))
+(define pipeline
+	(lambda (s)
+		((star <sexpr>) s 
+			(lambda (m r)
+				(map (lambda (e)
+						(annotate-tc
+							(pe->lex-pe
+								(box-set
+									(remove-applic-lambda-nil
+										(parse e))))))
+					  m))
+	   		(lambda (f) 'fail))))
 
 (define file->list
-  (lambda (in-file)
-    (let ((in-port (open-input-file in-file)))
-      (letrec ((run
+	(lambda (input-file)
+		(let ((in-port (open-input-file input-file)))
+			(letrec ((run (lambda ()
+							(let ((ch (read-char in-port)))
+								(if (eof-object? ch)
+									(begin (close-input-port in-port) '())
+									(cons ch (run)))))))
+				(run)))))
+
+(define string->file
+	(lambda (out-file str)
+		(if (file-exists? out-file) (delete-file out-file))
+		(let ((out-port (open-output-file out-file)))
+			(letrec ((run
+				(lambda (lst)
+					(if (null? lst) (close-output-port out-port)
+								(begin
+									(write-char (car lst) out-port)
+									(run (cdr lst)))))))
+				(run (string->list str))))))
+
+(define generate-label
+	(lambda (label-prefix)
 		(lambda ()
-		  (let ((readChar (read-char in-port)))
-		    (if (eof-object? readChar)
-			(begin
-			  (close-input-port in-port)
-			  '())
-			(cons readChar (run)))))))
-	(run)))))
+			(let ((index 0))
+				(lambda ()
+					(set! index (+ index 1))
+					(string-append label-prefix (number->string index)))))))
 
-(define file->string
-  (lambda (in-file)
-    (list->string (file->list in-file))))
+(define exit_or_lbl ((generate-label "exit_or_")))
+(define exit_if3_lbl ((generate-label "exit_if3_")))
+(define else_if3_lbl ((generate-label "else_if3_")))
+(define exit_app_lbl ((generate-label "exit_app_")))
+(define skip_code_lbl ((generate-label "skip_code_")))
+(define for_copy_args_lbl ((generate-label "for_copy_args_")))
+(define end_of_copy_args_lbl ((generate-label "end_of_copy_args_")))
+(define for_copy_envs_lbl ((generate-label "for_copy_envs_")))
+(define end_of_copy_envs_lbl ((generate-label "end_of_copy_envs_")))
+(define code_lbl ((generate-label "code_label_")))
+(define new_env_lbl ((generate-label "new_env_")))
+(define for_fix_stack_lbl ((generate-label "for_fix_stack_")))
+(define end_of_fix_stack_lbl ((generate-label "end_of_fix_stack_")))
+(define debug_lbl ((generate-label "DEBUG_")))
+(define dont_push_lbl ((generate-label "dont_push_arg_")))
+(define fvar_lbl ((generate-label "fvar_")))
 
-(define list->file
-  (lambda (lst out-file)
-    (let ((out-port (open-output-file out-file 'truncate)))
-      (letrec ((run
-                (lambda (lst)
-                  (if (null? lst)
-                      (close-output-port out-port)
-                      (begin (write-char (car lst) out-port)
-                             (run (cdr lst)))))))
-        (run lst)))))
+(define to-string
+	(lambda (exp)
+		(cond ((number? exp) (number->string exp))
+              ((symbol? exp) (symbol->string exp))
+              (else exp))))
 
-
-(define pipeline
-  (lambda (sexpr)
-    ((star <sexpr>) sexpr
-     (lambda (match rest)
-       (map (lambda (expr)
-	      ;;(display (format "Pipelining ~a\n" expr))
-	      (annotate-tc
-	       (pe->lex-pe
-		(box-set
-		 (remove-applic-lambda-nil
-		  (parse expr))))))
-	    match))
-     (lambda (fail) 'fail))))
-
-(define string->sexprs
-  (lambda (str)
-    (let ((stringList (string->list str)))
-      (letrec ((translate
-                (lambda (lst)
-                  (<sexpr> lst 
-                           (lambda (expr rest) (if (null? rest)
-                                             (list expr)
-                                             (cons expr (translate rest))))
-                           (lambda (msg) `(error ,@msg))))))
-        (translate stringList)))))
-
-(define create-code-to-run
-  (lambda (sexprs)
-    ;;(display (format "Sexprs: ~a\n" sexprs))
-    (fold-left string-append
-	       ""
-	       (map (lambda (expr)
-		      (string-append
-		       (code-gen expr)
-		       cg-print-rax))
-		    sexprs))))
-
-(define compile-scheme-file
-  (lambda (source dest)
-    (let* ((exprs (file->list source))
-	   (built-in (file->list "project/Built-in.scm"))
-	   (pipelined (pipeline (append built-in exprs)))
-	   (size (length pipelined)))
-      ;;(display (format "Pipelined = ~a\n" pipelined))
-      ;;(display (format "Before c-table...\n"))
-      (set! c-table (master-build-c-table pipelined 6))
-      ;;(display (format "C-Table:\n~a\n" c-table))
-      ;;(display (format "Before F-Table...\n"))
-      (set! f-table (master-build-f-table pipelined))
-      ;;(display (format "F-Table:\n~a\n" f-table))
-      (let* ((pre (generate-pre-text c-table f-table))
-	     (code (create-code-to-run pipelined)))
-	;;(display (format "Pre-Text:\n~a\nCode:\n~b\n" pre code))
-	(list->file (string->list (string-append pre
-						 code
-						 post-text))
-		  dest)))))
-	;;(display (format "Compiled Scheme file with ~a parsed expressions!\n" size))))))
-
-;--------------------------------------------------| cTable |--------------------------------------------------------
-
-(define T_UNDEFINED 0)
-(define T_VOID 1)
-(define T_NIL 2)
-(define T_INTEGER 3)
-(define T_FRACTION 4)
-(define T_BOOL 5)
-(define T_CHAR 6)
-(define T_STRING 7)
-(define T_SYMBOL 8)
-(define T_CLOSURE 9)
-(define T_PAIR 10)
-(define T_VECTOR 11)
-
-
-;  is empty or not a list   -> returns saved results
-;  car passes test          -> save car, remove it and do on the rest
-;  car is a list            -> open the car and do again
-;  else                     -> remove car and do on the rest
-
-(define improper-list?
-	(lambda (x)
-		(and (pair? x) (not (list? (last-pair x))))))
-		
-(define those-that-pass
-  (lambda (exps test positive-results)
-    ;;(display (format "Exps:\n ~a\nResults:\n~a\n" exps positive-results))
-    (cond 
-     ((or (not (pair? exps))
-	  (null? exps))
-      positive-results)
-     
-     ((test (car exps))
-      ;;(display (format "==> Expression ~a Passed test ~a\n" (car exps) test))
-      (those-that-pass (cdr exps) test (cons (car exps) positive-results)))
-     
-	 ((improper-list? (car exps))
-     	(append (those-that-pass (car exps) test '()) (those-that-pass (cdr exps) test positive-results)))
-	 
-     ((pair? (car exps))
-	   ;;(list? (caar exps)))
-      (those-that-pass `(,@(car exps) ,@(cdr exps)) test positive-results))
-     
-     (else (those-that-pass (cdr exps) test positive-results)))))
-;; returns deep search, returns elements that pass test
-;; TODO: if exps passes test, do not go into the those-that-pass function
-
-(define ordered-those-that-pass
-  (lambda (exps test)
-    ;;(display (format "Ordering:\nExprs: ~a\n" exps))
-    (let ((passed (those-that-pass exps test '())))
-      ;;(display (format "Passed: ~a\n" passed))
-      (reverse (those-that-pass exps test '())))))
-
-(define tagged-by-const
-  (lambda (exp)
-    (and (pair? exp) (equal? (car exp) 'const))))
-
-(define extract-consts
-  (lambda (exp)
-    (if (tagged-by-const exp)
-	(cdr exp)
-	(map (lambda (x) (cadr x))
-	     (ordered-those-that-pass exp tagged-by-const)))))
-
-(define extract-and-topo-sort-consts
-  (lambda (exp done)
-    ;;(display (format "Extract & sort consts:\nExp: ~a\nDone: ~a\n" exp done))
-    (if (null? exp) 
-	done
-	(let* ((sorted (topological-sort (car exp)))
-	       (reversed (reverse sorted)))
-	  ;;(display (format "Sorted: ~a\nReversed: ~a\n" sorted reversed))
-	  (extract-and-topo-sort-consts (cdr exp)
-					(append done
-						reversed))))))
-
-(define master-const-extract 
-  (lambda (exp)
-    (if (null? exp)
-	'()
-	(extract-and-topo-sort-consts (extract-consts exp) '()))))
-
-(define float->integer-func ;not very efficient, #f if didnt find or fnum being integer
-	(lambda (fnum guess)
-		(cond ((equal? 0.0 (- fnum guess)) guess)
-			  ((> guess fnum) #f)
-			  (else (float->integer-func fnum (+ 1 guess)))))) 
-(define float->integer ;not very efficient, #f if didnt find or fnum being integer
-	(lambda (fnum)
-		(float->integer-func fnum 0)))
-
-(define add-to-c-table  ;returns (table . nextmem)
-  (lambda (table element mem)
-    (cond ((char? element)
-	   ;; T_Char <index, value, (T_Char, value)>
-	   (cons (append table
-			 `((,mem ,element 
-				 (,T_CHAR ,(char->integer element)))))
-		 (+ 2 mem) ))
-          ((integer? element)
-	   ;; <index, value, (T_Integer, value)>
-	   (cons (append table
-			 `((,mem ,element
-				 (,T_INTEGER ,element))))
-		 (+ 2 mem)))
-          ((rational? element)
-	   ;; <index, value, (T_Fraction, num, denum)>
-	   (let* ((top (numerator element))
-		  (bottom (denominator element))
-		  (topIndx (c-table-contains? table top))
-		  (bottomIndx (c-table-contains? table bottom)))
-	     ;;(display (format "Adding T_FRACTION to C-table: ~a Rational? ~a\n" element (rational? element)))
-	     ;;(display (format "Num:~a\nDenum:~a\n" top bottom))
-	     ;;(display (format "Num Index:~a\nDenum Index:~a\n" topIndx bottomIndx))
-             (cond ((and topIndx bottomIndx)
-		    ;;has both ints -> add fraction          
-		    (cons (append table `((,mem ,element
-						(,T_FRACTION ,topIndx ,bottomIndx))))
-			  (+ 3 mem)))
-		   (topIndx										 ;;has only numerator -> add denominator and do again
-		    (add-to-c-table (car (add-to-c-table table bottom mem))
-				    element
-				    (cdr (add-to-c-table table bottom mem))))
-		   (else
-		    ;;has only maybe the denominator -> add numerator and do again 
-		    (add-to-c-table (car (add-to-c-table table top mem))
-				    element
-				    (cdr (add-to-c-table table top mem)))))))
-          ((string? element)
-	   ;; <index, value, (T_STRING, length, ASCII-list)>
-	   (cons (append table
-			 `((,mem ,element
-				 (,T_STRING ,(string-length element) ,(map char->integer (string->list element))))))
-		 (+ mem (string-length element) 2))) 
-          ((symbol? element)
-	   ;; <index, symbol, (T_Symbol, string)>
-           (let ((rep-str (symbol->string element)))
-             (if (c-table-contains? table rep-str)
-                 (cons (append table
-			       `((,mem ,element (,T_SYMBOL ,(c-table-contains? table rep-str)))))
-		       (+ 2 mem))
-                 (add-to-c-table (car (add-to-c-table table rep-str mem))
-				 element
-				 (cdr (add-to-c-table table rep-str mem))))))
-          ((pair? element)
-	   ;; <index, value, (T_PAIR, car-index, cdr-index)>
-	   (let ((carIndex (c-table-contains? table (car element)))
-		 (cdrIndex (c-table-contains? table (cdr element))))
-	     (cond ((and carIndex cdrIndex)
-		    (cons (append table
-				  `((,mem ,element (,T_PAIR ,carIndex ,cdrIndex))))
-			  (+ 3 mem)))
-		   (carIndex
-		    (add-to-c-table (car (add-to-c-table table (second element) mem))
-				    element
-				    (cdr (add-to-c-table table (second element) mem))))
-		   (else (add-to-c-table (first (add-to-c-table table (first element) mem))
-					 element
-					 (second (add-to-c-table table (first element) mem)))))))
-	  
-          ((vector? element)
-	   ;; <index, value, (T_Vector, length, index-list-of-elements)>
-	   (cons (append table
-			 `((,mem ,element (,T_VECTOR
-					   ,(vector-length element)
-					   ,(map (lambda (x)
-						   (c-table-contains? table x))
-						 (vector->list element))))))
-		 (+ mem (vector-length element) 2)))
-          (else 'error))))
-
-(define last-mem
-  (lambda (table starting-mem)
-    (if (null? table) starting-mem (caar (last-pair table)))))
-
-(define c-table-contains? ;returns adress
-  (lambda (table element)
-    (cond ((null? table) #f)
-          ((equal? element (cadar table)) (caar table))
-          (else (c-table-contains? (cdr table) element)))))
-
-(define build-c-table-func
-  (lambda (table lst mem)
-    ;;(display (format "Building C-Table function:\nTable: ~a\nList: ~a\n" table lst))
-    (cond  ((null? lst)
-	    table)
-           ((c-table-contains? table (car lst))
-	    (build-c-table-func table (cdr lst) mem))
-           (else
-	    (let* ((new-table (car (add-to-c-table table (car lst) mem)))
-		   (new-mem (cdr (add-to-c-table table (car lst) mem))))
-	      (build-c-table-func new-table (cdr lst) new-mem))))))
-
-
-(define starting-table
-  (lambda (mem)
-    `((,mem ,(if #f #f) (,T_VOID)) (,(+ 1 mem) () (,T_NIL)) (,(+ mem 2) #f (,T_BOOL 0)) (,(+ mem 4) #t (,T_BOOL 1)))))
-
-
-(define build-c-table
-  (lambda (lst starting-mem)
-    ;;(display (format "Building c-table with:\nLst: ~a\n" lst))
-    (build-c-table-func
-     (starting-table (- starting-mem 6))
-     lst
-     starting-mem)))
-
-(define topological-sort 
-  (lambda (e)
-    ;;(display (format "Topological Sort of ~a\n" e))
-    (cond 
-     ((or (number? e) (string? e) (eq? e (if #f #f)) (null? e) (boolean? e) (char? e) ) `(,e)) 
-     ((pair? e) 
-      `(,e ,@(topological-sort (car e)) ,@(topological-sort (cdr e))))
-     ((vector? e) 
-      `(,e ,@(apply append 
-		    (map topological-sort (vector->list e)))))
-     ((symbol? e)
-      `(,e ,@(topological-sort (symbol->string e))))
-     (else 'topological-sort-error))))
-
-(define master-build-c-table
-  (lambda (exp mem)
-    (build-c-table (master-const-extract exp) mem)))
-
-(define c-table-getLine
-  (lambda (table element)
-      (cond ((null? table)
-	     #f)
-	    ((equal? element (second (first table)))
-	     (first table))
-	    (else
-	     (c-table-getLine (cdr table) element)))))
-
-(define c-table-getLine-byType
-  (lambda (table element type)
-      (cond ((null? table)
-	     #f)
-	    ((and (equal? element (second (first table)))
-		  (equal? type (first (third table))))
-	     (first table))
-	    (else
-	     (c-table-getLine (cdr table) element type)))))
-
-;;a.k.a:  c-table[i] =
-(define c-table '())
-(define const-label "L_const")
-(define fvar-label "L_global")
-
-(define CHAR_NUL 0)
-(define CHAR_TAB 9)
-(define CHAR_NEWLINE 10)
-(define CHAR_PAGE 12)
-(define CHAR_RETURN 13)
-(define CHAR_SPACE 32)
-
-(define cg-c-table
-  (lambda (ct)
-    ;;(display (format "Generating C-Table...\n~a\n" ct))
-    (fold-left string-append
-	       (list->string '())
-	       (map (lambda (row)
-		      ;; Row = <Index, Value, (Type, Type-Data)>
-		      (let* ((index (first row))
-			     (value (second row))
-			     (data (third row))
-			     (type (first data))
-			     (type-data (cdr data)))
-			(cond
-			 ((equal? T_VOID type)
-			  (cg-T-void index))
-			 ((equal? T_NIL type)
-			  (cg-T-nil index))
-			 ((equal? T_INTEGER type)
-			  (cg-T-integer value index))
-			 ((equal? T_FRACTION type)
-			  (cg-T-fraction (first type-data) (second type-data) index))
-			 ((equal? T_BOOL type)
-			  (cg-T-bool (first type-data) index))
-			 ((equal? T_CHAR type)
-			  (cg-T-char value index))
-			 ((equal? T_STRING type)
-			  (cg-T-string (second data) (third data) index))
-			 ((equal? T_SYMBOL type)
-			  (cg-T-symbol (first type-data) index))
-			 ((equal? T_PAIR type)
-			  (cg-T-pair (first type-data) (second type-data) index))
-			 ((equal? T_VECTOR type)
-			  (cg-T-vector (first type-data) (second type-data) index))
-			 (else (number->string T_UNDEFINED)))))
-		    ct)
-	       )))
-
-(define make-const-label
-  (lambda (index)
-    (string-append const-label (number->string index) ":" newLine)))
-
-(define make-fvar-label
-  (lambda (index)
-    (string-append fvar-label (number->string index) ":" newLine)))
-
-(define cg-T-void
-  (lambda (index)
-    (string-append (make-const-label index)
-		   tab "dq SOB_VOID" newLine)))
-
-(define cg-T-nil
-  (lambda (index)
-    (string-append (make-const-label index)
-		   tab "dq SOB_NIL" newLine)))
-
-(define cg-T-bool
-  (lambda (value index)
-    (let ((true (equal? value 1)))
-      (string-append (make-const-label index)
-		     tab (if true
-			     "dq SOB_TRUE" 
-			     "dq SOB_FALSE")
-		     newLine))))
-
-(define get-T-char-value
-  (lambda (value)
-    (let ((val (char->integer value)))
-      ;;(display (format "Search char value: ~a\nintValue = ~a\n" value val))
-      (cond ((equal? val (char->integer #\newline))
-	     "CHAR_NEWLINE")
-	    ((equal? val (char->integer #\"))
-	     "\'\"\'")
-	    ((equal? val (char->integer #\\))
-	     "\'\\\'")
-	    ((equal? val (char->integer #\tab))
-	     "\'\t'")
-	    (else (string-append "\'" (string value) "\'"))))))
-
-(define cg-T-char
-  (lambda (value index)
-    ;;(display (format "c-gen to T_CHAR: ~a\n" value))
-    (string-append (make-const-label index)
-		   tab "dq MAKE_LITERAL(T_CHAR, " (get-T-char-value value) ")" newLine)))
-
-(define cg-T-integer
-  (lambda (value index)
-    (string-append (make-const-label index)
-		   tab "dq MAKE_LITERAL(T_INTEGER, " (number->string value) ")" newLine)))
-
-(define cg-T-fraction
-  (lambda (numIndx denumIndx index)
-    (string-append (make-const-label index)
-		   tab "dq MAKE_LITERAL_FRACTION(" const-label (number->string numIndx) ", " const-label (number->string denumIndx) ")" newLine)))
-
-(define list-index
-  (lambda (e lst)
-    (if (null? lst)
-	-1
-	(if (eq? (car lst) e)
-	    0
-	    (if (= (list-index e (cdr lst)) -1) 
-		-1
-		(+ 1 (list-index e (cdr lst))))))))
-
-(define append-params
-  (lambda (params)
-    (if (= (length params) 0) 
-	""
-	(fold-left (lambda (result current)
-		     (string-append result ", " current))
-		   (car params)
-		   (cdr params)))))
-
+(define remove-duplicates-from-list
+    (lambda (lst)
+        (fold-left (lambda (acc curr)
+                        (if (member curr acc)
+                            acc
+                            (append acc (list curr))))
+                    '()
+                    lst)))
 
 (define str-list->delimited-str
 	(lambda (lst)
@@ -486,1147 +85,2104 @@
 						(car lst)
 						(cdr lst)))))
 
+(define is-empty-string
+	(lambda (str)
+		(equal? str "")))
+
 (define string->str-list 
-  (lambda (chars)
-    (let* ((ans (fold-left
-		 (lambda (acc ch)
-		   (let ((curr-str (car acc))
-			 (ans-acc (cdr acc)))
-		     (cond ((equal? ch #\nul) 
-			    (if (is-empty-string curr-str)
-				(cons "" (append ans-acc (list "CHAR_NUL")))
-				(cons "" (append ans-acc
-						 (list (string-append "\"" curr-str "\""))
-						 (list "CHAR_NUL")))))
-			   ((equal? ch #\tab)
-			    (if (is-empty-string curr-str)
-				(cons "" (append ans-acc (list "CHAR_TAB")))
-				(cons "" (append ans-acc (list (string-append "\"" curr-str "\""))
-						 (list "CHAR_TAB")))))
-			   ((equal? ch #\newline)
-			    (if (is-empty-string curr-str)
-				(cons "" (append ans-acc (list "CHAR_NEWLINE")))
-				(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_NEWLINE")))))
-			   ((equal? ch #\return)
-			    (if (is-empty-string curr-str)
-				(cons "" (append ans-acc (list "CHAR_RETURN")))
-				(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_RETURN")))))
-			   ((equal? ch #\space) 
-			    (if (is-empty-string curr-str)
-				(cons "" (append ans-acc (list "CHAR_SPACE")))
-				(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_SPACE")))))
-			   (else 
-			    (cons (string-append curr-str (string (integer->char ch))) ans-acc)))))
-		 
-		 (cons "" '())
-		 chars)))
-      (if (equal? (car ans) "")
-	  (cdr ans)
-	  (append (cdr ans) (list (string-append "\"" (car ans) "\""))))
-      )
-    ))
-
-(define cg-T-string
-  (lambda (length chars index)
-    ;;(display (format "generating string const = ~a\n" chars))
-    (string-append
-     (make-const-label index)
-     tab "MAKE_LITERAL_STRING" (append-params (string->str-list chars)) newLine)))
-
-(define cg-T-symbol
-  (lambda (stringIndex index)
-      (string-append (make-const-label index)
-		     tab "dq MAKE_LITERAL_SYMBOL (" (string-append
-						const-label
-						(number->string stringIndex)) ")"
-		     newLine)))
-
-(define cg-T-pair
-  (lambda (carIndex cdrIndex index)
-    ;;(display (format "Generating Pair: carIndx: ~a cdrIndx: ~a\n" carIndex cdrIndex))
-    (string-append (make-const-label index)
-		   tab "dq MAKE_LITERAL_PAIR(" const-label (number->string carIndex) ", " const-label (number->string cdrIndex) ")" newLine)))
-
-(define cg-T-vector
-  (lambda (length items index)
-    (string-append
-     (make-const-label index)
-     tab "MAKE_LITERAL_VECTOR " (append-params items) newLine)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  F-Table  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;row = <Var-name, Index>
-;(define f-table '())
-
-;(define f-table-contains?
- ; (lambda (var ft)
- ;   (let ((row (first ft)))
- ;     (cond ((null? ft)
-;	     #f)
-;	    ((equal? var (first row))
-;	     (second row))
-;	    (else (f-table-contains? var (cdr ft)))))))
-
-;; Returns a list of all fvar-values
-;(define extract-fvars
-  ;(lambda (pe)
- ;   (cond ((not (pair? pe))
-;	   '())
-;	  ((tag? 'fvar pe)
-;	   (cdr pe))
-;	  (else
-;	   `(,@(extract-fvars (first pe)) ,@(extract-fvars (cdr pe)))))))
-
-;(define build-f-table
-;  (lambda (pe ft index)
-;    (add-to-f-table (remove-duplicates (extract-fvars pe)) ft index)))
-
-;(define add-to-f-table
-;  (lambda (vars ft index)
- ;     (cond ((null? vars)
-;	     ft)
-;	    ((f-table-contains? (first vars) ft)
-;	     (add-to-f-table (cdr vars) ft index))
-;	    (else
-;	     (add-to-f-table (cdr vars)
-;			     `(,@ft `(,(first vars) ,index))
-;			     (+ index 1))))))
-
-(define f-table-get-func ;; index
-	(lambda (table element)
-		(cond ((null? table) #f) 
-			  ((equal? (second (car table)) element) (first (car table)))
-			  (else (f-table-get-func (cdr table) element)))))
-
-(define f-table-get ;; index
-	(lambda (element)
-		(f-table-get-func f-table element)))
-		
-
-(define tagged-by-fvar
-  (lambda (exp)
-    (and (pair? exp) (equal? (car exp) 'fvar))))
-
-(define extract-fvars
-  (lambda (exp)
-    ;;(display (format "Extracting F-vars from ~a\n" exp))
-    (if (tagged-by-fvar exp)
-	(cdr exp)
-	(map (lambda (x) (second x))
-	     (ordered-those-that-pass exp tagged-by-fvar)))))
-
-(define f-table-contains? ;input is list of fvars, not the final table
-  (lambda (table element)
-    (cond ((null? table) #f)
-          ((equal? (car table) element) element)
-          (else (f-table-contains? (cdr table) element)))))
-
-(define f-table-add 
-  (lambda (table element)
-    (if (f-table-contains? table element)
-	table
-	(append table (list element)))))
-
-(define build-f-table
-  (lambda (table lst)
-    (if (null? lst)
-	table
-	(build-f-table (f-table-add table (car lst)) (cdr lst)))))
-
-(define give-indxes
-  (lambda (after before indx)
-    (if (null? before)
-	after
-	(give-indxes (cons (list indx (car before)) after) (cdr before) (+ 1 indx)))))
-
-(define master-give-indxes
-	(lambda (lst)
-		(reverse (give-indxes '() lst 0))))
-	
-(define master-give-indxes ;needs a list - not a single element
-  (lambda (lst)
-    (reverse (give-indxes '() lst 0))))
-
-(define master-build-f-table
-  (lambda (exp)
-    (let ((extracted (append built-in-funcs (extract-fvars exp))))
-      ;;(display (format "Extracted f-vars: ~a\n" extracted))
-	(master-give-indxes (build-f-table '() extracted)))))
-
-(define cg-f-table
-  (lambda (table)
-    ;;(display (format "Generating code for f-table:\n~a\n" table))
-    (fold-left string-append
-	       ""
-               (map (lambda (line)
-		      ;;(display (format "Handling line ~a\n" line))
-		      (string-append
-		       fvar-label (number->string (first line)) ":" newLine
-		       tab "dq MAKE_LITERAL(T_UNDEFINED, 0)" newLine))
-                    table))))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Symbol Table ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define symbol_count -1)
-(define symbol-label "symbol")
-
-(define get-symbols-func
-	(lambda (table passed)
-		(cond ((null? table) passed)
-		      ((symbol? (cadar table)) (get-symbols-func (cdr table) (append (list (cadar table)) passed)))
-		      (else (get-symbols-func (cdr table) passed)))))
-
-(define get-symbols
-	(lambda (table)
-		(get-symbols-func table '())))
-
-
-(define symb-table-make-func
-	(lambda (lst indx)
-		(set! symbol_count (+ 1 symbol_count))
-		(if (null? lst)
-			""
-			(string-append 
-			symbol-label (number->string indx) ": \n"
-			"dq MAKE_LITERAL_SYMBOL (" (string-append const-label (number->string (c-table-contains? c-table (symbol->string (car lst))))) ")\n" 
-			(symb-table-make-func (cdr lst) (+ 1 indx))
-			))
-		))
-(define symb-table-make
-	(lambda (lst)
-		(symb-table-make-func lst 0)))
-
-(define make-linked-symb-list-func 
-	(lambda (indx)
-		(if (= -1 indx) ""
-		(string-append
-		"mov rbx, "(string-append symbol-label (number->string indx)) "\n"		;rax has the last pair
-		"MAKE_MALLOC_LITERAL_PAIR rax, rbx, rax\n"
-		(make-linked-symb-list-func (- indx 1))
-		) 
-		)))
-(define make-linked-symb-list
-	(lambda ()
-		(string-append
-		 "mov rax, " (sobNull) "\n"
-		(make-linked-symb-list-func (- symbol_count 1) ) ;symbol_count
-		)))
-
-(define master-symbol-builder
-  (lambda (table) ;c-table
-    (let* ((firstPart (symb-table-make (get-symbols table)))
-	   (secondPart (make-linked-symb-list)))			
-      (string-append
-       firstPart
-       secondPart
-       "mov [SymbolTable], eax \n"
-       ))))
-
-
-
-
-
-
-;(define make-linked-list
-;	(lambda ))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;  Code Generation  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define tag?
-  (lambda (tag pe)
-    (and (list? pe)
-	 (equal? tag (first pe)))))
-
-(define code-gen
-  (lambda (pe)
-    ;; After each generation, the value of the generated code is in RAX
-    ;; Returns string
-    ;;(display (format "Code Gen to ~a\n" pe))
-    (string-append ;;";" (format "~a\n" pe)
-     (cond ((tag? 'const pe)
-	    (cg-const (second pe)))
-	   
-	   ((tag? 'pvar pe)
-	    (cg-pvar pe))
-	   
-	   ((tag? 'bvar pe)
-	    ;;(bvar x major minor)
-	    (cg-bvar (third pe) (forth pe)))
-	   
-	   ((tag? 'fvar pe)
-	    (cg-fvar (second pe)))
-	   
-	   ((tag? 'if3 pe)
-	    ;;(if3 test dit dif)
-	    (let ((test (second pe))
-		  (dit (third pe))
-		  (dif (forth pe)))
-	      (cg-if3 test dit dif)))
-	   
-	   ((tag? 'or pe)
-	    (cg-or (second pe) (make-label "L_orEnd")))
-	   
-	   ((tag? 'seq pe)
-	    ;;(seq (E1 .. En))
-	    (cg-seq (second pe)))
-	   
-	   ((tag? 'lambda-simple pe)
-	    (cg-lambda-simple pe))
-	   
-	   ((tag? 'lambda-opt pe)
-	    (cg-lambda-opt pe))
-	   
-	   ((tag? 'define pe)
-	    ;; (define (*var var) value)
-	    (cg-define (second (second pe)) (third pe)))
-	   
-	   ((or (tag? 'applic pe)
-		(tag? 'tc-applic pe))
-	    (cg-applic (second pe) (third pe)))
-	   
-	   ((tag? 'tc-applic pe)
-	    (string-append ";" (format "~a" pe) newLine))
-	   
-	   ((tag? 'set pe)
-	    ;;(set! (*var var * *) value)
-	    (let* ((var (second pe))
-		   (value (third pe))
-		   (cg-val (code-gen value)))
-	      (string-append cg-val
-			     (cond ((tag? 'bvar var)
-				    (cg-set-bvar (cdr var)))
-				   ((tag? 'pvar var)
-				    (cg-set-pvar (second var) (third var)))
-				   ((tag? 'fvar var)
-				    (cg-set-fvar (cdr var)))
-				   (else
-				    (string-append
-				     "Undefined set variable"
-				     newLine)))
-			     tab "MOV rax, " sobVoid newLine)))
-	   
-	   ((tag? 'box pe)
-	    (cg-box (second pe)))
-	   
-	   ((tag? 'box-get pe)
-	    (cg-box-get (second pe)))
-	   
-	   ((tag? 'box-set pe)
-	    ;;(box-set! (*var var * *) value)
-	    (let* ((var (second pe))
-		  (value (third pe))
-		  (cg-value (code-gen value)))
-	      (string-append cg-value
-			     tab "MOV rbx, rax" newLine
-			     (code-gen var)
-			     tab "MOV qword [rax], rbx" newLine
-			     ;;(cond ((tag? 'bvar var)
-		;;		    (cg-box-set-bvar (cdr var)))
-	;;;			   ((tag? 'pvar var)
-	;;			    (cg-box-set-pvar (second var) (third var)))
-	;;;			   ((tag? 'fvar var)
-	;;			    (cg-box-set-fvar (cdr var)))
-	;;			   (else
-	;;			    (string-append
-	;;			     "Undefined box-set variable type"
-	;;			     newLine)))
-			     tab "MOV rax, " sobVoid newLine)))
-	   (else
-	    (string-append ";;Code-Generation-Error" newLine))))))
-
-(define newLine
-  (list->string '(#\newline)))
-
-(define tab
-  (list->string '(#\tab)))
-
-(define labelIndex 0)
-
-(define make-label
-  (lambda (name)
-    (set! labelIndex (+ labelIndex 1))
-    (string-append name (number->string labelIndex))))
-
-(define cg-print-rax
-  (string-append
-   newLine
-   tab "PUSH qword [RAX]" newLine
-   tab "call write_sob_if_not_void" newLine
-   tab "ADD rsp, 1*8" newLine))
-
-(define cg-print-symbol
-   (string-append
-   tab "PUSH RAX" newLine
-   tab "call write_sob_symbol" newLine
-   tab "ADD rsp, 1*8" newLine))
-
-;;; Const
-
-(define cg-const
-  (lambda (const)
-    (let* ((row (c-table-getLine c-table const))
-	   (index (first row))
-	   (type (first (third row))))
-      (string-append ;;".t_" const-label (number->string index) ":" newLine
-		     tab "MOV RAX, " const-label (number->string index) newLine
-		     ;;newLine
-		     ;;cg-print-rax)
-		     ))))
-
-;;; Or
-
-(define cg-or
-  (lambda (lst end-label)
-    ;;(display (format "sobFalse = ~a\n" (sobFalse)))
-      (cond ((null? lst)
-	     (list->string '()))
-	    ((null? (cdr lst))
-	     (let ((cg-N (code-gen (first lst))))
-	       (string-append cg-N newLine
-			      end-label ":" newLine)))
-	    (else
-	     (let ((cg-i (code-gen (first lst))))
-	       (string-append cg-i newLine
-			      tab "CMP RAX, " (sobFalse)
-			      newLine
-			      tab "JNE " end-label newLine
-			      (cg-or (cdr lst) end-label)))))))
-;;; Vars
-
-(define cg-pvar
-  (lambda (pe)
-    (let ((minor (third pe)))
-      (string-append
-       tab "MOV RAX, qword [rbp + " (number->string (+ minor 4)) "*8]" newLine))))
-
-(define cg-bvar
-  (lambda (major minor)
-    (string-append
-     tab "MOV RAX, qword [rbp + 2*8]" newLine
-     tab "MOV RAX, qword [RAX + " (number->string major) "*8]" newLine
-     tab "MOV RAX, qword [RAX + " (number->string minor) "*8]" newLine)))
-
-(define cg-fvar ;var needs to be the symbol
-  (lambda (var)
-    (string-append
-    tab "MOV RAX, [" fvar-label (number->string (f-table-get var)) "]" newLine)))
-
-;;; If3
-(define sobNull
-	(lambda ()
-		(string-append const-label (number->string (c-table-contains? c-table '())))))
-
-(define sobFalse
-  (lambda ()
-    (string-append const-label (number->string (c-table-contains? c-table #f)))))
-
-(define sobTrue
-  (lambda ()
-    (string-append const-label (number->string (c-table-contains? c-table #t)))))
-
-(define sobVoid (string-append const-label "0"))
-
-(define cg-if3
-  (lambda (test dit dif)
-    (let ((test-cg (code-gen test))
-	  (dit-cg (code-gen dit))
-	  (dif-cg (code-gen dif))
-	  (l-dif (make-label "L_ifDif"))
-	  (l-end (make-label "L_ifEnd")))
-      
-      (string-append test-cg newLine
-		     tab "MOV RBX, " (sobFalse) newLine
-		     tab "CMP RAX, RBX" newLine
-		     tab "JE " l-dif newLine
-		     dit-cg newLine
-		     tab "JMP " l-end newLine
-		     l-dif ":" newLine
-		     dif-cg newLine
-		     l-end ":" newLine
-		     ))))
-;;; Seq
-
-(define cg-seq
-  (lambda (pe)
-    (fold-left (lambda (result e)
-    ;;(display (format "cg-seq: e = ~a\nresult = ~b\n" e result))
-		 (string-append result (code-gen e) newLine))
-	       ""
-	       pe)))
-;;; Set
-
-(define cg-set-bvar
-  (lambda (var major minor)
-    (string-append
-     tab "MOV rbx, qword [rbp + 2*8]" newLine
-     tab "MOV rbx, qword [rbx + " (number->string major) "*8]" newLine
-     tab "MOV rbx, qword [rbx + " (number->string minor) "*8]" newLine
-     tab "MOV qword [rbx], rax" newLine)))
-
-(define cg-set-pvar
-  (lambda (var minor)
-    (string-append
-     tab "MOV qword [rbp + " (number->string (+ 4 minor)) "*8], RAX" newLine)))
-
-(define cg-set-fvar
-  ;;(set! (fvar var) value)
-  ;; RAX = [|value|]
-  (lambda (var)
-    (string-append
-     tab "MOV qword [" fvar-label (number->string (f-table-get var)) "], RAX" newLine)))
-
-;;; Box
-
-(define malloc
-  (lambda (size)
-    (string-append
-     tab "PUSH rdi" newLine
-     tab "MOV rdi, " (number->string (* size 8)) newLine
-     tab "call malloc" newLine
-     tab "POP rdi" newLine)))
-
-(define cg-box
-  ;; Rax = address of var
-  (lambda (var)
-    (string-append
-     (code-gen var) ;; Rax - var
-     tab "PUSH rbx" newLine
-     tab "PUSH rcx" newLine
-     tab "PUSH rdx" newLine
-     tab "PUSH rbp" newLine
-     tab "PUSH rsi" newLine
-     newLine
-     tab "MOV rbx, rax" newLine
-     (malloc 1)
-     tab "MOV qword [rax], rbx" newLine
-     newLine
-     tab "POP rsi" newLine
-     tab "POP rbp" newLine
-     tab "POP rdx" newLine
-     tab "POP rcx" newLine
-     tab "POP rbx" newLine
-     )))
-
-(define cg-box-get
-  (lambda (var)
-    (string-append
-     (code-gen var) ;; Rax = var value
-     tab "MOV rax, [rax]" newLine ;; Unbox
-     )))
-
-(define cg-box-set-bvar
-  (lambda (var major minor)
-    (string-append
-     tab "MOV rbx, qword [rbp + 2*8]" newLine
-     tab "MOV rbx, qword [rbx + " (number->string major) "*8]" newLine
-     tab "MOV rbx, qword [rbx + " (number->string minor) "*8]" newLine
-     tab "MOV qword [rbx], rax" newLine
-     )))
-
-(define cg-box-set-pvar
-  (lambda (var minor)
-    (string-append
-     tab "MOV rbx, [rbp + " (+ 4 minor) "*8]" newLine
-     tab "MOV [rbx], rax" newLine)))
-
-(define cg-box-set-fvar
-  (lambda (var-name)
-    (string-append
-     tab "MOV rbx, [" fvar-label (number->string (f-table-get var-name)) "]" newLine
-     tab "MOV [rbx], rax" newLine)))
-
-;;; Applic
-
-(define cg-push-args
-  (lambda (args)
-    (fold-left (lambda (result arg)
-		 (string-append result
-				(code-gen arg)
-				tab "PUSH rax" newLine))
-	       ""
-	       (reverse args))))
-
-(define cg-pop-args
-  (lambda (args)
-    (fold-left (lambda (result arg)
-		 (string-append result
-				tab "POP rbx" newLine))
-	       ""
-	       args)))
-
-(define applic-T-closure-error-label "L_Applic_closure_error")
-(define error-applic-label "L_error_applic")
-
-(define cg-check-T-closure
-  ;; Rax = generated closure
-  (lambda (continue-label)
-    (string-append
-     ;;tab "MOV RAX, qword [RAX]" newLine
-     tab "MOV RAX, qword [RAX]" newLine
-     tab "TYPE rax" newLine
-     tab "CMP rax, T_CLOSURE" newLine
-     tab "JE " continue-label newLine
-     tab "POP rax" newLine
-     tab "POP rbx" newLine
-     tab "MOV rax, " error-applic-label newLine
-     cg-print-rax
-     tab "JMP L_exit" newLine)))
-
-(define applic-num 0)
-
-(define cg-applic
-  (lambda (proc args)
-    (let* ((args-length (length args))
-	   (string-length (number->string args-length)))
-      ;;(display (format "Code-gen Applic:\nargs-length = ~a\nString-length = ~a\n" args-length  string-length))
-      (set! applic-num (+ 1 applic-num))
-      (string-append
-       ";; cg-applic" newLine
-       (cg-push-args args)
-       newLine
-       ;;tab "XOR rbx, rbx" newLine
-       ;;tab "MOV rbx, " string-length newLine
-       tab "PUSH " string-length newLine ;; num of args
-       ;;tab "PUSH " (number->string args-length) newLine
-       newLine
-       (code-gen proc) ;;Rax = Closure value
-       newLine
-       tab "MOV rax, [rax]" newLine
-       tab "MOV rbx, rax" newLine
-       tab "TYPE rbx" newLine
-       newLine
-       tab "CMP rbx, T_CLOSURE" newLine
-       tab "JNE .end_applic" (number->string applic-num) newLine
-       newLine
-       tab "MOV rbx, rax" newLine
-       tab "CLOSURE_ENV rbx" newLine
-       tab "PUSH rbx" newLine ;; Env
-       tab "CLOSURE_CODE rax" newLine
-       tab "call rax" newLine
-       ".end_applic" (number->string applic-num) ":" newLine
-       tab "ADD rsp, "  (number->string (* 8 (+ 2 args-length))) newLine
-       ))))
-
-;;; Define
-
-(define cg-define
-  (lambda (var value)
-    ;;(display (format "f-table::\n~a\n" f-table))
-    ;;(display (format "cg-define:\nVar = ~a\nValue = ~a\n" var value))
-    (let ((address (number->string (f-table-get var))))
-      ;;(display (format "Address for (~a ~a) is ~a\n" var value address))
-      (string-append
-       ";; cg-define" newLine
-       (code-gen value)
-       newLine
-       tab "MOV qword [" fvar-label address "], RAX" newLine
-       tab "MOV RAX, " sobVoid newLine))))
+	(lambda (str)
+		(let* ((ans (fold-left (lambda (acc ch)
+								(let ((curr-str (car acc)) (ans-acc (cdr acc)))
+								(cond ((equal? ch #\nul) 
+										(if (is-empty-string curr-str)
+											(cons "" (append ans-acc (list "CHAR_NUL")))
+											(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_NUL")))))
+									  ((equal? ch #\tab)
+										(if (is-empty-string curr-str)
+											(cons "" (append ans-acc (list "CHAR_TAB")))
+											(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_TAB")))))
+									  ((equal? ch #\newline)
+										(if (is-empty-string curr-str)
+											(cons "" (append ans-acc (list "CHAR_NEWLINE")))
+											(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_NEWLINE")))))
+									  ((equal? ch #\return)
+									  	(if (is-empty-string curr-str)
+											(cons "" (append ans-acc (list "CHAR_RETURN")))
+											(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_RETURN")))))
+									  ((equal? ch #\space) 
+									  	(if (is-empty-string curr-str)
+											(cons "" (append ans-acc (list "CHAR_SPACE")))
+											(cons "" (append ans-acc (list (string-append "\"" curr-str "\"")) (list "CHAR_SPACE")))))
+									  (else 
+											(cons (string-append curr-str (list->string (list ch))) ans-acc)))))
+
+							  	(cons "" '())
+							 	(string->list str))))
+			(if (equal? (car ans) "")
+				(cdr ans)
+				(append (cdr ans) (list (string-append  (car ans)))))
+		)
+	))
 
 (define lexical_env -1)
 
-(define arg_count "arg_count")
+;------------------------LABEL-----------------------------------
 
-(define cg-lambda-simple
-  (lambda (pe)
-    (set! lexical_env (+ lexical_env 1))
-    (let* ((args (cadr pe))
-	   (body (caddr pe))
-	   (skip_code_label (make-label "skip_code"))
-	   (for_copy_args (make-label "for_copy_args"))
-	   (end_of_copy_args (make-label "end_of_copy_args"))
-	   (for_copy_envs (make-label "for_copy_envs"))
-	   (end_of_copy_envs (make-label "end_of_copy_envs"))
-	   (code_label (make-label "code"))
-	   (new_env (make-label "new_env"))
-	   (str-gen (string-append
-		     ";; cg-lambda-simple" newLine
-		     ;;create new env
-		     tab "mov rbx, 0" newLine;env
-		     tab "mov rax, " (number->string lexical_env) newLine;major
-		     tab "cmp rax, 0" newLine
-		     tab "je " end_of_copy_envs newLine
-		     newLine
-		     tab "mov rdi, "(number->string (* 8 (+ 1 lexical_env))) newLine;for allocating space for new extended env 
-		     tab "call malloc" newLine
-		     ".after_malloc1:" newLine
-		     tab "mov rbx, rax"	newLine ;;rbx = malloc(8*(n+1)) *this is x*
-		     newLine
-		     tab "XOR rax, rax" newLine
-		     tab "mov rax, " arg_count newLine
-		     tab "mov rdi, 8" newLine
-		     tab "mul rdi" newLine
-		     tab "PUSH rbx" newLine	;save value of rbx 
-		     tab "mov rdi, rax" newLine
-		     tab "call malloc" newLine
-		     ".after_malloc2:" newLine
-		     tab "POP rbx" newLine
-		     tab "mov rcx, rax"	newLine
-		     ;;rcx = malloc(8*m) *params of lambda*
-		     ;;copy arguments into rcx
-		     newLine
-		     tab "mov rdi, 0" newLine
-		     for_copy_args":" newLine
-		     tab "cmp rdi, " arg_count newLine
-		     tab "je " end_of_copy_args newLine
-		     newLine
-		     tab "mov rax, 8" newLine
-		     tab "mul rdi" newLine
-		     tab "mov rdx, An(rdi)" newLine  ; rdx = i'th argument
-		     tab "mov qword [rcx+rax], rdx" newLine ;; copy arg i into [rcx+8*i]
-		     newLine
-		     tab "inc rdi" newLine
-		     tab " jmp "for_copy_args newLine
-		     newLine
-		      end_of_copy_args":" newLine
-		     tab "mov qword [rbx], rcx" newLine
-		     tab "mov r14, env"	newLine	;; rdx=previous env
-		     tab "cmp r14, 0" newLine
-		     tab "je "end_of_copy_envs"\n"
-		     tab "mov rdi, 0\n"
-		     newLine
-		     for_copy_envs":\n"
-		     tab "cmp rdi, " (number->string lexical_env) "\n"
-		     tab "je "end_of_copy_envs"\n"
-		     newLine
-		     tab "mov rax, 8\n"
-		     tab "mul rdi\n"
-		     tab "mov rcx, qword [r14+rax]\n" ; rcx = i'th env
-		     tab "mov qword [rbx+rax+8], rcx\n" ; copy env i into [rbx+8*i+8]
-		     tab "inc rdi\n"
-		     tab "jmp "for_copy_envs"\n"
-		     newLine
-		     end_of_copy_envs":\n"
-		     ;;create target
-		     tab "PUSH rbx\n"
-		     tab "PUSH rcx\n"
-		     tab "mov rdi, 16\n"
-		     tab "call malloc\n" ;rax = malloc(8*2)
-		     ".after_malloc3:" newLine
-		     tab "pop rcx\n"
-		     tab "pop rbx\n"
-		     newLine
-		     tab "push rdx\n"
-		     tab "mov rdx, "code_label "\n"
-                   ; "MAKE_LITERAL_CLOSURE rax, rbx, "code_label "\n"
-		     tab "MAKE_LITERAL_CLOSURE rax, rbx, rdx \n"
-		     ".after_make_closure:" newLine
-		     tab "pop rdx\n"
+(define label-start-index 1)
 
-		     tab "jmp "skip_code_label"\n"
-		     newLine
-		     ;;create code
-		     code_label":\n"
-		     tab "push rbp\n"
-		     tab "mov rbp, rsp\n"
-		     newLine
-		     tab (code-gen body)
-		     tab "mov rbx, rax\n"
-		     tab "mov rax, " arg_count newLine
-		     tab "add rax, 1\n"
-		     tab "mov rdi, 8\n"
-		     tab "mul rdi\n"
-		     tab "add rsp, rax\n"
-		     tab "mov rax, rbx\n"
-		     newLine
-		     tab "leave\n"
-		     tab "ret\n"
-		     newLine
-		     skip_code_label":\n")))
-      (set! lexical_env (- lexical_env 1)) 
-      str-gen)))
+(define update-label
+    (lambda (lbl-prefix)
+        (let ((curr-index label-start-index))
+            (set! label-start-index (+ label-start-index 1))
+            (string-append lbl-prefix (number->string curr-index)))))
 
-(define cg-lambda-opt
-  (lambda (pe)
-    (set! lexical_env (+ lexical_env 1))
-    (let* ((args (cadr pe))
-    	(opt (caddr pe))
-	   (body (cadddr pe))
-	   (code_end (make-label "code_end")) (loop_copy_args_ (make-label "loop_copy_args_")) (loop_copy_args_end (make-label "loop_copy_args_end"))
-	   (loop_copy_envs (make-label "loop_copy_envs")) (loop_copy_envs_end (make-label "loop_copy_envs_end")) (code (make-label "code")) (new_env (make-label "new_env"))
-	   (loop_fix_stack (make-label "loop_fix_stack")) (loop_fix_stack_end (make-label "loop_fix_stack_end"))
-	   (str-gen (string-append
-		     ";; cg-lambda-opt" newLine
-		     "mov rbx, 0\n"
-		     "mov rax, " (number->string lexical_env) "\n"
-		     "cmp rbx, 0\n"
-		     "cmp rax, 0\n"
-		     "je "loop_copy_envs_end"\n"
-		     tab "push rax \n"
-		     newLine
-		     "mov rdi, "(number->string (* 8 (+ 1 lexical_env)))"\n"
-		     "call malloc\n"
-		     "mov rbx, rax\n"	
-		     tab "pop rax \n"
-		     "mov rax, arg_count\n"
-		     "mov rdi, 8\n"
-		     "mul rdi\n"
-		     "push rbx\n"	
-		     "mov rdi, rax\n"
-		     "call malloc\n"
-		     "pop rbx\n"
-		     "mov rcx, rax\n"						
-		     "mov rdi, 0\n"
-		     newLine
-		     loop_copy_args_":\n"
-		     "inc rax\n"
-		     "cmp rax, arg_count \n"
-		     "sub rax, 1 \n"
-		     "cmp rdi, arg_count\n"
-		     "je "loop_copy_args_end"\n"
-		     "mov rax, 8\n"
-		     "mul rdi\n"
-		     "mov rdx, An(rdi)\n"   
-		     "mov qword [rcx+rax], rdx\n" 
-		     "inc rdi\n"
-		     "jmp "loop_copy_args_"\n"
-		     loop_copy_args_end":\n"		     
-		     "mov qword [rbx], rcx\n"		     
-		     "mov r14, env\n"		
-		     "cmp r14, 0\n"
-		     "jle "loop_copy_envs_end"\n"
-		     "mov rdi, 0\n"
-		     newLine
-		     loop_copy_envs":\n"
-		     "cmp rdi, " (number->string lexical_env) "\n"
-		     "je "loop_copy_envs_end"\n"
-		     "mov rax, 8\n"
-		     "mul rdi\n"
-		     "cmp rdi, 999999 \n"
-		     "je " loop_copy_envs "\n" 
-		     "mov rcx, qword [r14+rax]\n" 
-		     "mov qword [rbx+rax+8], rcx\n" 
-		     "inc rdi\n"
-		     "jmp "loop_copy_envs"\n"		
-		     newLine     
-		     loop_copy_envs_end":\n"					
-		     "push rbx\n"
-		     "push rcx\n"
-		     "mov rdi, 16\n"
-		     "call malloc\n" 
-		     "pop rcx\n"
-		     "pop rbx\n"		     
-		     "MAKE_LITERAL_CLOSURE rax, rbx, " code "\n"
-		     "jmp "code_end"\n"
-		     newLine
-		     code":\n"
-		     "push rbp\n"
-		     "mov rbp, rsp\n"
-		     "mov rbx, " (sobNull) "\n"
-		     "mov r10, arg_count\n"
-		     newLine
-		     loop_fix_stack":\n"
-		     "cmp r10, "(number->string (length args)) "\n"
-		     "je " loop_fix_stack_end "\n"
-		     "mov rdi, 8\n"
-		     "call malloc\n"			
-		     "mov rdx, rbp\n"				
-		     "add rdx, 4*8\n"				
-		     "mov r11, r10\n"				
-		     "dec r11\n"
-		     "shl r11, 3\n"							
-		     "add rdx, r11\n"				
-		     "mov rdx, qword [rdx]\n"		
-		     "inc rax\n"
-		     "sub rax, 1\n"
-		     "MAKE_MALLOC_LITERAL_PAIR rax, rdx, rbx\n"	
-		     "mov rbx, rax\n"				
-		     "dec r10\n"					
-		     "jmp " loop_fix_stack "\n"
-		     newLine
-		     loop_fix_stack_end":\n"
-		     "cmp rbx, " (sobNull) "\n"
-		     "mov qword [rbp+4*8+"(number->string (length args))"*8], rbx\n"	
-			(code-gen body)
-			"leave\n"
-			"ret\n"
-			code_end":\n")))
+;------------------------CONST-TABLE------------------------------
+
+
+
+
+(define turn_to_ascii_strings
+	(lambda (str)
+		(map (lambda (x) (number->string (char->integer x))) (string->list str))))
+
+
+(define const-table `(,void () ,#t ,#f))
+
+(define expand-const-table
+    (lambda (pe)
+        (cond 	((or (null? pe) (not (list? pe))) #f)
+              	((equal? (car pe) 'const)
+              		(let ((val (cadr pe)))
+	                	(cond  	((null? val) #f) 
+	                		   	((vector? val)
+	                        		(begin (vector-map (lambda (e) (expand-const-table `(const ,e))) val)
+	                            	   	   (set! const-table (append const-table (list val)))))
+	                      	   	((pair? val)
+	                       		 	(begin (expand-const-table `(const ,(car val)))
+	                               		   (expand-const-table `(const ,(cdr val)))
+	                               		   (set! const-table (append const-table (list val)))))              
+	                      	   	((and (number? val) (not (integer? val)))
+	                                (let* ((original-num (numerator val))
+	                                	   (original-den (denominator val))
+	                                	   (gcd-val (gcd original-num original-den))
+	                                       (updated-num (/ original-num gcd-val))
+	                                       (updated-den (/ original-den gcd-val)))
+	                                    (begin (expand-const-table `(const ,updated-num))
+	                                           (expand-const-table `(const ,updated-den))
+	                                           (set! const-table (append const-table (list val))))))
+	                          	((symbol? val) 
+	                          		(begin 	(set! const-table (append const-table (list (symbol->string val))))
+		                                    (set! const-table (append const-table (list val))))) 
+		                      	(else (set! const-table (append const-table (list val)))))))
+                      
+              	(else (map expand-const-table pe)))))
+                   
+(define remove-duplicates-from-const-table
+    (lambda ()
+        (set! const-table (remove-duplicates-from-list const-table))))
+
+(define get-label-from-const-table
+    (lambda(constant tagged-table)
+        (let* ((curr-row (car tagged-table))
+        	   (curr-val (cadr curr-row))
+        	   (curr-label (car curr-row)))
+        	  (if (equal? constant curr-val)
+        	  		curr-label
+        	  	  (get-label-from-const-table constant (cdr tagged-table))))))
+                    
+(define const-table-add-type-id
+    (lambda()
+        (set! const-table 
+        	(fold-left
+                (lambda (acc-table constant)
+                	(let ((const-lbl "const_"))
+                		(append acc-table 
+			                    (list (cond 	
+			                    		((equal? constant void) `(,(update-label const-lbl) ,constant T_VOID))
+			                          	((equal? constant '()) `(,(update-label	const-lbl) ,constant T_NIL))
+			                          	((equal? constant #t) `(,(update-label const-lbl) ,constant T_BOOL))
+			                          	((equal? constant #f) `(,(update-label const-lbl) ,constant T_BOOL))
+			                        	((number? constant)
+			                            	(let* ((original-num (numerator constant))
+			                                	   (original-den (denominator constant))
+			                            		   (gcd-val (gcd original-num original-den))
+			                                       (updated-num (/ original-num gcd-val))
+			                                       (updated-den (/ original-den gcd-val)))
+			                                (if (integer? constant)
+			                                    `(,(update-label const-lbl) ,updated-num T_INTEGER)
+			                                    `(,(update-label const-lbl) ,constant T_FRACTION))))
+			                        	((char? constant) `(,(update-label const-lbl) ,constant T_CHAR))
+				                        ((vector? constant)
+				                                `(,(update-label const-lbl) ,constant T_VECTOR))
+				                        ((string? constant)
+				                                `(,(update-label const-lbl) ,constant T_STRING))
+				                        ((symbol? constant)
+				                            `(,(update-label const-lbl) ,constant T_SYMBOL))
+				                        ((pair? constant)
+				                            `(,(update-label const-lbl) ,constant T_PAIR))
+				                        (else (error 'constant "const table add type id error")))))))
+                '()
+                const-table))))
+
+(define create-const-table
+	(lambda (pe-lst)
+		(begin (expand-const-table pe-lst)
+			   (remove-duplicates-from-const-table)
+			   (const-table-add-type-id)
+		)
+    ))
+
+(define get-const-string
+	(lambda ()
+		(fold-left
+            (lambda (acc el)
+            	(let ((const-val (cadr el))
+					  (const-label (car el)))
+                    (cond 	((equal? const-val void)
+								(string-append acc (string-append const-label ":\n\t dq SOB_VOID\n")))
+				    	   	((equal? const-val '())
+								(string-append acc (string-append const-label ":\n\t dq SOB_NIL\n")))
+							((equal? const-val #t)
+								(string-append acc (string-append const-label ":\n\t dq SOB_TRUE\n")))
+							((equal? const-val #f)
+								(string-append acc (string-append const-label ":\n\t dq SOB_FALSE\n")))
+	                    	((number? const-val)
+	                        	(let* ((original-num (numerator const-val))
+	                        		   (original-den (denominator const-val))
+	                        		   (gcd-val (gcd original-num original-den))
+	                                   (updated-num (/ original-num gcd-val))
+	                                   (updated-den (/ original-den gcd-val)))
+	                            	(if (integer? const-val)
+	                            		(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL(T_INTEGER, "(number->string updated-num)")\n"))
+	                            		(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL_FRACTION("(get-label-from-const-table updated-num const-table) 
+	                            																				  	  ", "(get-label-from-const-table updated-den const-table)")\n")))))
+	                    	((char? const-val) 
+								(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL(T_CHAR, "(number->string (char->integer const-val))")\n")))
+	                        ((vector? const-val)
+	                            (let ((label-lst (map (lambda (x) (get-label-from-const-table x const-table)) (vector->list const-val)))
+	                            	  (vector-len (vector-length const-val)))
+                        			(string-append acc (string-append const-label ":\n\t MAKE_LITERAL_VECTOR " (str-list->delimited-str label-lst)"\n"))))
+	                        ((string? const-val)
+                        		(string-append acc (string-append const-label ":\n\t MAKE_LITERAL_STRING " (str-list->delimited-str (turn_to_ascii_strings (car (string->str-list const-val))))"\n")))
+	                        ((symbol? const-val)
+                        		(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL_SYMBOL("(get-label-from-const-table (symbol->string const-val) const-table)")\n")))
+	                        ((pair? const-val)
+	                        	(string-append acc (string-append const-label ":\n\t dq MAKE_LITERAL_PAIR("(get-label-from-const-table (car const-val) const-table)
+	                            																	    ", "(get-label-from-const-table (cdr const-val) const-table)")\n")))
+	                        (else (error 'constant "const table add address and type id error")))))
+                ""
+                const-table)))
+
+;------------------------GLOBAL-VAR-TABLE------------------------------
+
+(define init-global-var-table '((car "car") 
+							   (cdr "cdr")
+							   (cons "cons")
+							   (list "list")
+							   (null? "null?")
+							   (boolean? "boolean?")
+							   (pair? "pair?")
+							   (char? "char?")
+							   (integer? "integer?")
+							   (procedure? "procedure?")
+							   (string? "string?")
+							   (symbol? "symbol?")
+							   (vector? "vector?")
+							   (zero? "zero?")
+							   (not "not")
+							   (car "car")
+							   (cdr "cdr")
+							   (number? "number?")
+							   (rational? "rational?") 
+							   (eq? "eq?")
+							   (char->integer "char_to_integer")
+							   (integer->char "integer_to_char")
+							   (numerator "numerator")
+							   (denominator "denominator")
+							   (string-length "string_length")
+							   (vector-length "vector_length")
+							   (string-ref "string_ref")
+							   (vector-ref "vector_ref")
+							   (remainder "remainder")
+							   (bin_equal "bin_equal")
+							   (bin_plus  "bin_plus")
+							   (bin_minus "bin_minus")
+							   (bin_mul   "bin_mul")
+							   (bin_div   "bin_div")
+							   (bin_less_than   "bin_less_than")
+							   (bin_greater_than   "bin_greater_than")
+							   (string-set! "string_set")
+							   (vector-set! "vector_set")
+							   (make-string "make_string")
+							   (make-vector "make_vector")
+							   (vector "custom_vector")
+							   (+ "plus")
+							   (- "minus")
+							   (/ "div")
+							   (* "mul")
+							   (< "less_than")
+							   (> "greater_than")
+							   (= "equal")
+							   (map "map")
+							   (apply "apply")
+							   (symbol->string "symbol_to_string")
+							   (string->symbol "string_to_symbol")))
+
+(define global-var-table init-global-var-table)
+
+(define expand-global-var-table
+    (lambda (pe)
+        (cond ((or (not (list? pe)) (null? pe)) #f)
+              ((and (equal? (car pe) 'fvar) (not (assq (cadr pe) init-global-var-table)))
+                (set! global-var-table (append global-var-table (list (list (cadr pe) (fvar_lbl))))))
+              (else (map expand-global-var-table pe)))))
+
+(define remove-duplicates-from-global-var-table
+    (lambda ()
+        (set! global-var-table (remove-duplicates-from-list global-var-table))))
+
+(define get-label-from-global-var-table
+    (lambda (val curr-var-table)
+        (let* ((curr-row (car curr-var-table))
+        	   (curr-val (car curr-row))
+        	   (curr-label (cadr curr-row)))
+        	  (if (equal? val curr-val)
+        	  		curr-label
+        	  	  (get-label-from-global-var-table val (cdr curr-var-table))))))
+
+(define create-global-var-table
+	(lambda (pe-lst)
+		(begin (expand-global-var-table pe-lst)
+			   (remove-duplicates-from-global-var-table)
+			   ;(global-var-table-add-address)
+			)))
+
+(define get-fvar-string
+	(lambda ()
+		(fold-left
+	        (lambda (acc el)
+	            	(string-append acc (cadr el) ":\n\tdq SOB_UNDEFINED\n"))
+	        ""
+	        global-var-table)))
+
+;------------------------SYMBOL-TABLE------------------------------
+
+(define count-symbols
+	(lambda ()
+		(fold-left 
+    		(lambda (acc el)
+    			(if (equal? (caddr el) 'T_SYMBOL)
+    				(+ acc 1)
+    				acc))
+    		0
+    		const-table)))
+
+
+
+(define gen-symbol-table 
+    (lambda (curr-const-table index number-of-symbols-left)
+        (if (equal? number-of-symbols-left 0)
+        	(if (equal? index 0)
+                (string-append "symbol_table:\n\t dq const_2\n") 
+            	(string-append "symbol_table:\n\t dq symbol_0\n"))
+            (if (not (null? curr-const-table))
+            	(let* ((el (car curr-const-table)) 
+    		  		  (const-label (car el)) 
+    		  		  (const-val (cadr el)) 
+    		  		  (const-type (caddr el)))
+                	(if (not (equal? const-type 'T_SYMBOL))
+                    	(gen-symbol-table (cdr curr-const-table) index number-of-symbols-left)
+                    	(if (equal? number-of-symbols-left 1)
+							(string-append "symbol_"(number->string index)": 
+								\n\t dq MAKE_LITERAL_PAIR("const-label", const_2)\n" (gen-symbol-table (cdr curr-const-table) (+ index 1) (- number-of-symbols-left 1)))
+							(string-append "symbol_"(number->string index)": 
+								\n\t dq MAKE_LITERAL_PAIR("const-label", symbol_"(number->string (+ index 1))")\n"(gen-symbol-table (cdr curr-const-table) (+ index 1) (- number-of-symbols-left 1))))))
+            (gen-symbol-table (cdr const-table) index number-of-symbols-left)))))
+
+
+;------------------------CODE-GEN------------------------------
+
+(define code-gen
+    (lambda (pe)
+        (cond 
+            ((equal? (car pe) 'if3) (gen-if  pe))
+            ((equal? (car pe) 'seq) (gen-seq pe))
+            ((equal? (car pe) 'or)  (gen-or  pe))
+            ((equal? (car pe) 'applic)  (gen-app pe))
+           	((equal? (car pe) 'tc-applic)  (gen-app pe))
+           	((equal? (car pe) 'lambda-simple)  (gen-lambda-simple pe))
+            ((equal? (car pe) 'lambda-opt)  (gen-lambda-opt pe))
+            ((equal? (car pe) 'define) (gen-define pe))
+            ((equal? (car pe) 'const) (gen-const pe))
+            ((equal? (car pe) 'fvar)  (gen-fvar pe))
+            ((equal? (car pe) 'bvar) (gen-bvar pe))
+            ((equal? (car pe) 'pvar) (gen-pvar pe))
+            ((equal? (car pe) 'set) (gen-set pe))
+            ((equal? (car pe) 'box) (gen-box pe))
+            ((equal? (car pe) 'box-set) (gen-box-set pe))
+            ((equal? (car pe) 'box-get) (gen-box-get pe))
+            (else "mov rax, const_4\n")
+        )))
+
+(define gen-const
+    (lambda(pe)
+        (string-append "mov rax, "(to-string (get-label-from-const-table (cadr pe) const-table))"\n")))
+
+(define gen-fvar
+	(lambda(pe)
+		(string-append "mov rax, ["(get-label-from-global-var-table (cadr pe) global-var-table)"]\n")))
+
+(define gen-define
+    (lambda(pe)
+    	(let ((var-name (cadadr pe)) (pe-val (caddr pe)) (void_lbl "const_1"))
+	        (string-append
+	            (code-gen pe-val)
+	            "mov [" (cadr (assq var-name global-var-table)) "], rax\n"
+	            "mov rax, "void_lbl"\n"
+	        ))))
+
+(define gen-or
+    (lambda (pe)
+        (let ((exit_lbl (exit_or_lbl)) (first_arg (caadr pe)) (rest_args (cdadr pe)))
+            (string-append
+                (code-gen first_arg)
+                (fold-right
+                    string-append
+                    ""
+                    (map (lambda (next-el)
+                            (string-append "cmp rax , const_4\n"
+                                           "jne " exit_lbl "\n"
+                                           (code-gen next-el)))
+                    		rest_args))
+                exit_lbl ":\n"))))
+
+(define gen-if
+    (lambda (pe)
+        (let ((exit_lbl (exit_if3_lbl)) (else_lbl (else_if3_lbl)) (test_if3 (cadr pe)) (then_if3 (caddr pe)) (else_if3 (cadddr pe)))
+            (string-append
+                (code-gen test_if3)
+                "cmp rax, const_4\n"
+                "je "else_lbl"\n"
+                (code-gen then_if3)
+                "jmp "exit_lbl"\n"
+                else_lbl":\n"
+                (code-gen else_if3)
+                exit_lbl":\n"))))
+
+(define gen-seq
+    (lambda (pe)
+        (fold-left
+            string-append
+            ""
+            (map code-gen (cadr pe)))))
+
+(define gen-app
+    (lambda (pe)
+        (let ((args (reverse (caddr pe))) (proc (cadr pe)) (exit_lbl (exit_app_lbl)))
+        (string-append
+        	;"push const_2\n"
+            (fold-left
+                string-append
+                ""
+                (map (lambda (el)
+                    (string-append
+                        (code-gen el)
+                        "push rax\n"))
+                 args))
+            "push "(number->string (length args))"\n"
+			(code-gen proc)
+			"mov rax, [rax]\n"
+			"mov rbx, rax\n"
+			"TYPE rbx\n"
+
+            "cmp rbx, T_CLOSURE\n"
+            "jne "exit_lbl"\n"
+
+            "mov rbx, rax\n"            
+			"CLOSURE_ENV rbx\n"
+			"push rbx\n"			;push env
+            "CLOSURE_CODE rax\n"
+            "call rax\n"
+            exit_lbl":\n"
+            "add rsp, " (number->string (* 8 (+ 2 (length args))) ) "\n"))))
+
+(define gen-tc-app
+    (lambda (pe)
+        (let ((args (reverse (caddr pe))) (proc (cadr pe)) (exit_lbl (exit_app_lbl)) (for_copy_args (for_copy_args_lbl)) (end_of_copy_args (end_of_copy_args_lbl)))
+        (string-append
+        	;"push const_2\n"
+            (fold-left
+                string-append
+                ""
+                (map (lambda (el)
+                    (string-append
+                        (code-gen el)
+                        "push rax\n"))
+                 args))
+            "push "(number->string (length args))"\n"
+			(code-gen proc)
+			"mov rax, [rax]\n"
+			"mov rbx, rax\n"
+			"TYPE rbx\n"
+            "cmp rbx, T_CLOSURE\n"
+            "jne "exit_lbl"\n"
+
+            "mov rbx, rax\n"            
+			"CLOSURE_ENV rbx\n"
+			"push rbx\n"
+			
+			"push ret_addr\n" ;save return address
+			"mov r8, rbp\n"
+			"mov rbp, qword[r8]\n"
+			"mov r11,rsp\n"
+
+			"mov r15,arg_count\n"
+			"add r15, 5\n" 
+
+			;copy arguments into rbp
+			"mov rdi, "(number->string (+ 4 (length args))) "\n"
+			for_copy_args":\n"
+			"cmp rdi, 0\n"
+			"je "end_of_copy_args"\n"
+
+			"mov r12, rdi\n"
+			"dec r12\n"
+			"shl r12, 3\n"
+
+			"mov r10,qword[r11+r12]\n"
+			"dec r15\n"
+			"mov r12,r15\n"
+			"shl r12, 3\n"
+			"mov qword[r8+r12],r10\n"
+			"dec rdi\n"
+			
+			"jmp "for_copy_args"\n"
+			end_of_copy_args":\n"
+
+			"mov r12,r15\n"
+			"shl r12, 3\n"
+			"lea rsp,[r8+r12]\n"
+
+            "CLOSURE_CODE rax\n"
+            "jmp rax\n"
+
+            exit_lbl":\n"
+            ;"add rsp, " (number->string (* 8 (+ 3 (length args))) ) "\n"
+        	))))
+
+
+(define gen-lambda-simple
+    (lambda (pe)
+        (set! lexical_env (+ lexical_env 1))
+            (let* ((args (cadr pe)) (body (caddr pe))
+            	  (skip_code_label (skip_code_lbl)) (for_copy_args (for_copy_args_lbl)) (end_of_copy_args (end_of_copy_args_lbl))
+            	  (for_copy_envs (for_copy_envs_lbl)) (end_of_copy_envs (end_of_copy_envs_lbl)) (code_label (code_lbl)) (new_env (new_env_lbl))
+                  (str-gen (string-append
+                  	;create new env
+                  	"mov rbx, 0\n";env
+                    "mov rax, " (number->string lexical_env) "\n";major
+                    "cmp rax, 0\n"
+                    "je "end_of_copy_envs"\n"
+                    "mov rdi, "(number->string (* 8 (+ 1 lexical_env)))"\n";for allocating space for new extended env 
+                    "call malloc\n"
+                    "mov rbx, rax\n"	;rbx = malloc(8*(n+1)) **this is x**
+                    
+                    "mov rax, arg_count\n"
+					"mov rdi, 8\n"
+					"mul rdi\n"
+                    "push rbx\n"	;save value of rbx 
+                    "mov rdi, rax\n"
+                    "call malloc\n"
+                    "pop rbx\n"
+                    "mov rcx, rax\n"	;rcx = malloc(8*m) **params of lambda**
+
+                    ;copy arguments into rcx
+					"mov rdi, 0\n"
+					for_copy_args":\n"
+					"cmp rdi, arg_count\n"
+					"je "end_of_copy_args"\n"
+					"mov rax, 8\n"
+					"mul rdi\n"
+					"mov rdx, An(rdi)\n"   ; rdx = i'th argument
+					"mov qword [rcx+rax], rdx\n" ; copy arg i into [rcx+8*i]
+					"inc rdi\n"
+					"jmp "for_copy_args"\n"
+					end_of_copy_args":\n"
+
+					"mov qword [rbx], rcx\n"
+
+					"mov r14, env\n"		; rdx=previous env
+					"cmp r14, 0\n"
+					"je "end_of_copy_envs"\n"
+					"mov rdi, 0\n"
+					for_copy_envs":\n"
+					"cmp rdi, " (number->string lexical_env) "\n"
+					"je "end_of_copy_envs"\n"
+					"mov rax, 8\n"
+					"mul rdi\n"
+					"mov rcx, qword [r14+rax]\n" ; rcx = i'th env
+					"mov qword [rbx+rax+8], rcx\n" ; copy env i into [rbx+8*i+8]
+					"inc rdi\n"
+					"jmp "for_copy_envs"\n"
+					end_of_copy_envs":\n"
+
+                    ;create target
+                    "push rbx\n"
+                    "push rcx\n"
+                    "mov rdi, 16\n"
+                    "call malloc\n" ;rax = malloc(8*2)
+                    "pop rcx\n"
+                    "pop rbx\n"
+
+                    "MAKE_LITERAL_CLOSURE rax, rbx, " code_label "\n"
+
+                    "jmp "skip_code_label"\n"
+					;create code
+					code_label":\n"
+					"push rbp\n"
+					"mov rbp, rsp\n"
+					(code-gen body)
+					"mov rbx, rax\n"
+					"mov rax, arg_count\n"
+					"add rax, 1\n"
+					"mov rdi, 8\n"
+					"mul rdi\n"
+					"add rsp, rax\n"
+					"mov rax, rbx\n"
+					"leave\n"
+					"ret\n"
+					skip_code_label":\n")))
+        		(set! lexical_env (- lexical_env 1)) 
+        		str-gen)))
+
+(define gen-lambda-opt
+    (lambda (pe)
+        (set! lexical_env (+ lexical_env 1))
+            (let* ((args (cadr pe))
+            	   (body (cadddr pe))
+            	   (skip_code_label (skip_code_lbl)) (for_copy_args (for_copy_args_lbl)) (end_of_copy_args (end_of_copy_args_lbl))
+            	   (for_copy_envs (for_copy_envs_lbl)) (end_of_copy_envs (end_of_copy_envs_lbl)) (code_label (code_lbl)) (new_env (new_env_lbl))
+            	   (for_fix_stack (for_fix_stack_lbl)) (end_of_fix_stack (end_of_fix_stack_lbl)) (dont_push_arg_label (dont_push_lbl))
+                   (str-gen (string-append
+                  	;create new env
+                  	"mov rbx, 0\n";env
+                    "mov rax, " (number->string lexical_env) "\n";major
+                    "cmp rax, 0\n"
+                    "je "end_of_copy_envs"\n"
+                    "mov rdi, "(number->string (* 8 (+ 1 lexical_env)))"\n";for allocating space for new extended env 
+                    "call malloc\n"
+                    "mov rbx, rax\n"	;rbx = malloc(8*(n+1)) **this is x**
+                    
+                    "mov rax, arg_count\n"
+					"mov rdi, 8\n"
+					"mul rdi\n"
+                    "push rbx\n"	;save value of rbx 
+                    "mov rdi, rax\n"
+                    "call malloc\n"
+                    "pop rbx\n"
+                    "mov rcx, rax\n"	;rcx = malloc(8*m) **params of lambda**
+
+                    ;copy arguments into rcx
+					"mov rdi, 0\n"
+					for_copy_args":\n"
+					"cmp rdi, arg_count\n"
+					"je "end_of_copy_args"\n"
+					"mov rax, 8\n"
+					"mul rdi\n"
+					"mov rdx, An(rdi)\n"   ; rdx = i'th argument
+					"mov qword [rcx+rax], rdx\n" ; copy arg i into [rcx+8*i]
+					"inc rdi\n"
+					"jmp "for_copy_args"\n"
+					end_of_copy_args":\n"
+
+					"mov qword [rbx], rcx\n"
+
+					"mov r14, env\n"		; r14=previous env
+					"cmp r14, 0\n"
+					"jle "end_of_copy_envs"\n"
+					"mov rdi, 0\n"
+					for_copy_envs":\n"
+					"cmp rdi, " (number->string lexical_env) "\n"
+					"je "end_of_copy_envs"\n"
+					"mov rax, 8\n"
+					"mul rdi\n"
+					"mov rcx, qword [r14+rax]\n" ; rcx = i'th env
+					"mov qword [rbx+rax+8], rcx\n" ; copy env i into [rbx+8*i+8]
+					"inc rdi\n"
+					"jmp "for_copy_envs"\n"
+					
+					end_of_copy_envs":\n"
+                    ;create target
+                    "push rbx\n"
+                    "push rcx\n"
+                    "mov rdi, 16\n"
+                    "call malloc\n" ;rax = malloc(8*2)
+                    "pop rcx\n"
+                    "pop rbx\n"
+
+                    "MAKE_LITERAL_CLOSURE rax, rbx, " code_label "\n"
+
+                    "jmp "skip_code_label"\n"
+
+					code_label":\n"
+					"push rbp\n"
+					"mov rbp, rsp\n"
+					"mov rbx, const_2\n"
+					"mov r10, arg_count\n"
+
+					for_fix_stack":\n"
+					"cmp r10, "(number->string (length args)) "\n"
+					"je " end_of_fix_stack "\n"
+					
+					"mov rdi, 8\n"
+					"call malloc\n"			
+					"mov rdx, rbp\n"				
+					"add rdx, 4*8\n"				;rdx point to n+m in stack (offset)
+					"mov r11, r10\n"				;r10 is helper for point of arg[i]
+					"dec r11\n"
+					"shl r11, 3\n"				;now offset+r10 = address of curr arg				
+					"add rdx, r11\n"				;rdx = address of arg[i]
+					"mov rdx, qword [rdx]\n"		
+					
+					"MAKE_MALLOC_LITERAL_PAIR rax, rdx, rbx\n"	;rax = target, rbx = cdr, rcx = car
+					"mov rbx, rax\n"				;rbx ponints to the new pair as cdr for the new allocate in next iteration
+					"dec r10\n"					
+					"jmp " for_fix_stack "\n"
+					
+					end_of_fix_stack":\n"
+					"cmp rbx, const_2\n"
+					;"je "dont_push_arg_label"\n"
+					"mov qword [rbp+4*8+"(number->string (length args))"*8], rbx\n"	;add the list in stack after const params (not optinals)
+					;dont_push_arg_label":\n"
+					;"mov qword [rbp+5*8+"(number->string (length args))"*8], const_2\n"
+					;"mov qword [rbp + 3*8], "(number->string (+ 1 (length args)))"\n" ;update arg_count
+					;"add rsp, r9\n"
+
+					(code-gen body)
+					
+					"leave\n"
+					"ret\n"
+					skip_code_label":\n")))
         (set! lexical_env (- lexical_env 1)) 
 	str-gen)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pre-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define gen-pvar
+	(lambda (pe)
+		(let ((minor (caddr pe)))
+			(string-append "mov rax, qword [rbp+32+"(number->string minor)"*8]\n"))))
+
+(define gen-bvar
+	(lambda (pe)
+		(let ((major (caddr pe)) (minor (cadddr pe)))
+			(string-append 
+			"mov rax, qword [rbp+16]\n"
+			;"mov rax, env\n"
+			"mov rax, qword [rax+"(number->string major)"*8]\n"
+			"mov rax, qword [rax+"(number->string minor)"*8]\n"
+			))))
+
+(define gen-set
+	(lambda (pe)
+		(let ((tag (caadr pe))
+               (var (cadadr pe))
+               (val (caddr pe)))
+			(cond ((equal? tag 'pvar) 
+                    (let ((minor (car (cddadr pe))))
+						(string-append
+						(code-gen val)
+						"mov qword [rbp+8*(4+"(number->string minor)")], rax\n"
+						"mov rax, const_1\n"
+						)))
+                   ((equal? tag 'bvar)
+                    (let ((major (car (cddadr pe)))
+                         (minor (car(cdr (cddadr pe)))))
+                            (string-append
+                                (code-gen val)
+                                "mov rbx, qword [rbp+16]\n"
+                                "mov rbx, qword [rbx+8*"(number->string major)"]\n"
+                                "mov qword [rbx+8*"(number->string minor)"], rax\n"
+								"mov rax, const_1\n")))
+                       ((equal? tag 'fvar) 
+                            (string-append
+                                (code-gen val)
+                                "mov ["(get-label-from-global-var-table var global-var-table)"], rax\n"
+                                "mov rax, const_1\n"
+                                ))
+                      (else "wrong input")))))
+
+(define gen-box
+	(lambda (pe)
+		(let ((var (cadr pe)))
+			(string-append
+				(code-gen var)
+				"mov rbx, rax\n"
+				"mov rdi, 8\n"
+				"call malloc\n"
+				"mov qword [rax], rbx\n"
+			))))
+
+(define gen-box-get
+	(lambda (pe)
+		(let ((var (cadr pe)))
+			(string-append
+				(code-gen var)
+				"mov qword rax, [rax]\n"
+			))))
+
+(define gen-box-set
+	(lambda (pe)
+		(let ((var (cadr pe)) (val (caddr pe)))
+			(string-append
+				(code-gen val)
+				"mov rbx, rax\n"
+				(code-gen var)
+				"mov qword [rax], rbx\n"
+				"mov rax, const_1\n"
+			))))
 
 
-(define param-get-def (string-append
-		       newLine
-		       ";;; Parameter Getters" newLine
-		       newLine
-		       "%define param(offset) qword [rbp + offset]" newLine
-		       newLine
-		       "struc scmframe" newLine
-		       ".old_rbp: resq 1" newLine
-		       ".ret_addr: resq 1" newLine
-		       ".env: resq 1" newLine
-		       ".arg_count: resq 1" newLine
-		       ".A0: resq 1" newLine
-		       ".A1: resq 1" newLine
-		       ".A2: resq 1" newLine
-		       ".A3: resq 1" newLine
-		       ".A4: resq 1" newLine
-		       ".A5: resq 1" newLine
-		       "endstruc" newLine
-		       newLine
-		       "%define old_rbp param(scmframe.old_rbp)" newLine
-		       "%define ret_addr param(scmframe.ret_addr)" newLine
-		       "%define env param(scmframe.env)" newLine
-		       "%define arg_count param(scmframe.arg_count)" newLine
-		       "%define A0 param(scmframe.A0)" newLine
-		       "%define A1 param(scmframe.A1)" newLine
-		       "%define A2 param(scmframe.A2)" newLine
-		       "%define A3 param(scmframe.A3)" newLine
-		       "%define A4 param(scmframe.A4)" newLine
-		       "%define A5 param(scmframe.A5)" newLine
-		       "%define An(n) qword [rbp + 8*(n+4)]" newLine
-		       newLine
-		       ))
+;------------------------LIBRARY-FUNCTIONS------------------------------
 
-(define generate-pre-text
-  (lambda (ct ft)
-    ;;(display (format "Generating Prolog\n"))
-    (string-append "%include \"project/scheme.s\"" newLine
-		   param-get-def
-		   newLine
-		   "section .bss" newLine
-		   "global main" newLine
-		   "extern malloc, exit" newLine
-		   newLine
-		   "section .data" newLine
-		   "start_of_data:" newLine
-		   error-applic-label ":" newLine
-		   tab "MAKE_LITERAL_STRING \"Error:\", CHAR_SPACE, \"Applic\", CHAR_SPACE, \"on\", CHAR_SPACE, \"non\", CHAR_SPACE, \"procedure\"" newLine
-		   newLine
-		   (cg-f-table ft)
-		   newLine
-		   (cg-c-table ct)
+;(define append-scheme-lib-functions
+;	(lambda (lst) (append (string->list (string-append lib-fold-left lib-plus lib-map))
+;								  lst)))
 
-		   "SymbolTable: \n"
-		   "dq 1\n" ; 1 is arbituary
+(define append-scheme-lib-functions
+	(lambda (lst) (append (string->list (string-append lib-map lib-list lib-fold-left lib-bin-append lib-append 
+				   						 				lib-equal lib-greater-than lib-less-than lib-less-than lib-plus lib-minus lib-mul lib-div ))
+						  lst)))
 
+(define lib-map "(define map (lambda (proc lst) (if (null? lst) 
+													lst 
+													(cons (proc (car lst)) (map proc (cdr lst))))))\n")
 
-		   newLine
-		   ;;(cg-built-in-closures (filter (lambda (row)
-		   ;;(built-in? (second row)))
-		   ;;f-table))
-		   "section .text" newLine
-		   newLine
-		   "main:" newLine
-		   tab "PUSH 0" newLine
-		   tab "PUSH 0" newLine
-		   tab "PUSH L_exit" newLine
-		   tab "push rbp" newLine
-		   tab "mov rbp, rsp" newLine
-		;   (master-symbol-builder ct)
-		 ;  "mov [SymbolTable], rax \n"
-		   newLine
-		   (cg-built-in)
-		   ;;(cg-built-in-closures (filter (lambda (row)
-						   ;;(built-in? (second row)))
-		   ;;f-table))
-		   )))
+(define lib-list "(define list (lambda x x))\n")
 
+(define lib-fold-left "(define fold_left (lambda (proc init lst) (if (null? lst) 
+																	 init 
+																	 (fold_left proc (proc init (car lst)) (cdr lst)))))\n")
 
+(define lib-bin-append "(define bin_append (lambda (lst1 lst2) (if (null? lst1) 
+																	lst2 
+																	(cons (car lst1) (bin_append (cdr lst1) lst2)))))\n")
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Post-Text ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define lib-append "(define append (lambda x (fold_left bin_append '() x)))\n")
 
-(define l-exit "L_exit")
+(define lib-equal "(define = (lambda x (fold_left (lambda (acc y) (and acc (bin_equal (car x) y))) #t x)))\n")
 
-(define cg-error
-  (lambda (msgPtr)
-    (string-append
-     tab "MOV rax, " msgPtr newLine
-     cg-print-rax)))
+(define lib-greater-than "(define > (lambda x (if (null? (cdr x))
+												  #t 
+												  (and (bin_greater_than (car x) (car (cdr x))) (apply > (cdr x)))))) \n")
 
-(define cg-error-applic
-  (lambda ()
-    (let ((chars (map (lambda (ch)
-			(char->integer ch))
-		      (string->list "Apply argument not a clusure!\n"))))
-      (string-append
-       newLine
-       applic-T-closure-error-label ":" newLine
-       (cg-error error-applic-label)
-       newLine
-       tab "JMP " l-exit newLine
-       newLine
-       "section .text" newLine))))
+(define lib-less-than "(define < (lambda x (if (null? (cdr x)) 
+												#t 
+												(and (bin_less_than (car x) (car (cdr x))) (apply < (cdr x)))))) \n")
 
-(define post-text
-  ;;(begin
-  ;;(display (format "Generating Epilogue\n"))
-  (string-append
-   l-exit ":" newLine
-   tab "leave" newLine
-   tab "MOV rax, 0" newLine
-   tab "call exit" newLine))
-   ;; tab "ret" newLine))
-   ;; tab "MOV rax, 60" newLine
-   ;; tab "MOV rdi, 0" newLine
-   ;; tab "syscall" newLine))
-   
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Built-in ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define lib-plus "(define + (lambda x (fold_left (lambda (acc y) (bin_plus acc y)) 0 x)))\n")
 
+(define lib-minus "(define - (lambda x (if (null? (cdr x)) 
+											(bin_minus 0 (car x)) 
+											(fold_left (lambda (acc y) (bin_minus acc y)) (car x) (cdr x)))))\n")
 
-(define cg-cons
+(define lib-mul "(define * (lambda x (fold_left (lambda (acc y) (bin_mul acc y)) 1 x)))\n")
+
+(define lib-div "(define / (lambda x (if (null? (cdr x)) 
+										 (bin_div 1 (car x)) 
+										 (fold_left (lambda (acc y) (bin_div acc y)) (car x) (cdr x)))))\n")
+
+(define code-gen-library-functions
+    (lambda ()
+        (string-append
+            (gen-cons)
+            (gen-car)
+            (gen-cdr)
+            (gen-null?)
+            (gen-pair?)
+            (gen-boolean?)
+            (gen-char?)
+            (gen-integer?)
+            (gen-procedure?)
+            (gen-string?)
+            (gen-symbol?)
+            (gen-vector?)
+            (gen-zero?)
+            (gen-apply)
+            (gen-make-string)
+            (gen-make-vector)
+            (gen-not)
+            (gen-string-length)
+            (gen-vector-length)
+            (gen-vector)
+            (gen-char->integer)
+            (gen-integer->char)
+            (gen-string-ref)
+            (gen-vector-ref)
+            (gen-symbol->string)
+            (gen-string->symbol)
+            (gen-bin-mul)
+            (gen-bin-div)
+            (gen-bin-minus)
+            (gen-bin-equal)
+            (gen-bin-less-than)
+            (gen-bin-greater-than)
+            (gen-string-set)
+            (gen-vector-set)
+            (gen-bin-plus)
+            (gen-remainder)
+            (gen-denominator)
+            (gen-numerator)
+            (gen-number?)
+            (gen-rational?)
+            (gen-eq?)
+            )))
+
+(define validate-type-code-gen
+
+    (lambda (type-label tag)
+    	(let ((lower-case-type-label (string-downcase type-label)))
+	        (string-append
+	           lower-case-type-label":\n"
+	            "mov rdi, 16\n"
+	            "call malloc\n"
+	            "mov rbx, qword 0\n"
+	            "MAKE_LITERAL_CLOSURE rax, rbx, "lower-case-type-label"_body\n"
+	            "mov ["(symbol->string tag)"], rax\n"
+	            "jmp "lower-case-type-label"_exit\n"
+
+	            
+	            lower-case-type-label"_body:\n"
+	            "push rbp\n"
+				"mov rbp, rsp\n"
+	            "mov rbx, arg_count\n"
+	            "cmp rbx, 1\n"
+	 			"jne "lower-case-type-label"_exit\n"
+	            "mov r10, An(0)\n"
+	            "mov r10, [r10]\n"
+	            "TYPE r10\n"
+	            "cmp r10, T_"type-label"\n"
+	            "jne "lower-case-type-label"_not\n"
+	            "mov rax, const_3\n" 
+	            "jmp "lower-case-type-label"_finish\n"
+	            lower-case-type-label"_not:\n"
+	            "mov rax, const_4\n"
+	           	lower-case-type-label"_finish:\n"
+	            "leave\n"
+				"ret\n"
+	            
+	            lower-case-type-label"_exit:\n"))))
+        
+(define gen-null?
     (lambda()
-      (string-append
-       "mov rdi, 16\n"
-       "call malloc\n"
-       "mov rbx, qword 0\n"
-       "MAKE_LITERAL_CLOSURE rax, rbx, cons_body\n"
-       "mov [L_global21], rax\n"
-       "jmp cons_exit\n"
-       "cons_body:\n"
-       "push rbp\n"
-       "mov rbp, rsp\n"
-       "mov rbx, arg_count\n"
-       "cmp rbx, 2\n" 
-       "jne cons_finish\n"
-       "mov rdi, 8\n"
-       "call malloc\n"
-       "mov rcx, An(0)\n"
-       "mov rdx, An(1)\n"
-       "MAKE_MALLOC_LITERAL_PAIR rax, rcx, rdx\n"
-       "cons_finish:\n"
-       "leave\n"
-       "ret\n"
-       "cons_exit:\n")))
-(define cg-car
-  (lambda()
-    (string-append
-     "mov rdi, 16\n"
-     "call malloc\n"
-     "mov rbx, qword 0\n"
-     "MAKE_LITERAL_CLOSURE rax, rbx, car_body\n"
-     "mov [L_global2], rax\n"
-     "jmp car_exit\n"
-     "car_body:\n"
-     "push rbp\n"
-     "mov rbp, rsp\n"       
-     "mov rax, An(0)\n"
-     "mov rax, [rax]\n"
-     "DATA_UPPER rax\n"
-     "add rax, start_of_data\n"
-     "leave\n"
-     "ret\n"
-     "car_exit:\n")))
+        (validate-type-code-gen "NIL" 'null?)))
 
-(define cg-cdr
-  (lambda()
-    (string-append
-     "mov rdi, 16\n"
-     "call malloc\n"
-     "mov rbx, qword 0\n"
-     "MAKE_LITERAL_CLOSURE rax, rbx, cdr_body\n"
-     "mov [L_global19], rax\n"
-     "jmp cdr_exit\n"
-     "cdr_body:\n"
-     "push rbp\n"
-     "mov rbp, rsp\n"       
-     "mov rax, An(0)\n"
-     "mov rax, [rax]\n"
-     "DATA_LOWER rax\n"
-     "add rax, start_of_data\n"
-     "leave\n"
-     "ret\n"
-     "cdr_exit:\n")))
+(define gen-pair?
+    (lambda()
+        (validate-type-code-gen "PAIR" 'pair?)))
+        
+(define gen-boolean?
+    (lambda()
+        (validate-type-code-gen "BOOL" 'boolean?)))
+        
+(define gen-char?
+    (lambda()
+        (validate-type-code-gen "CHAR" 'char?)))
+        
+(define gen-integer?
+    (lambda()
+        (validate-type-code-gen "INTEGER" 'integer?)))
+        
+(define gen-procedure?
+    (lambda()
+        (validate-type-code-gen "CLOSURE" 'procedure?)))
+        
+(define gen-string?
+    (lambda()
+        (validate-type-code-gen "STRING" 'string?)))
+        
+(define gen-symbol?
+    (lambda()
+        (validate-type-code-gen "SYMBOL" 'symbol?)))
+        
+(define gen-vector?
+    (lambda()
+        (validate-type-code-gen "VECTOR" 'vector?)))
 
-(define cg-string->symbol
-  (lambda ()
-    (string-append ""     
-		   )))
+(define gen-zero?
+    (lambda()
+        (string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, zero?_body\n"
+            "mov [zero?], rax\n"
+            "jmp zero?_exit\n"
+            
+            "zero?_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne zero_finish\n"
 
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "je zero_check\n"
+	        "cmp rax, T_FRACTION\n"
+	        "jne zero_finish\n"
 
+	        "zero_check:\n"
+	        "mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "DATA rax\n"
+	        "cmp rax, 0\n"
+	        "je zero_true\n"
+	        "mov rax, const_4\n"
+	        "jmp zero_finish\n"
+	        "zero_true:\n"
+	        "mov rax, const_3\n"
 
-(define cg-char->integer
-  (lambda()
-	  (string-append
-	   "mov rdi, 16\n"
-	   "call malloc\n"
-	   "mov rbx, qword 0\n"
-	   "MAKE_LITERAL_CLOSURE rax, rbx, char_to_integer_body\n"
-	   "mov [L_global20], rax\n"
-	   "jmp char_to_integer_exit\n"
-	   
-	   "char_to_integer_body:\n"
-	   "push rbp\n"
-	   "mov rbp, rsp\n"         
-	   "mov rbx, arg_count\n"
-	   "cmp rbx, 1\n" 
-	   "jne char_to_integer_finish\n"
-	   
-	   "mov rax, An(0)\n"
-	   "mov rax, [rax]\n"
-	   "mov rbx, rax\n"
-	   "TYPE rax\n"
-	   "cmp rax, T_CHAR\n"
-	   "jne char_to_integer_finish\n"
-	   
-	   "sub rbx, T_CHAR\n"
-	   "or rbx, T_INTEGER\n"
-	   
-	   "mov rdi,8\n"
-	   "call malloc\n"
-	   "mov qword [rax], rbx\n"
-	   
-	   "char_to_integer_finish:\n"
-	   "leave\n"
-	   "ret\n"
-	   "char_to_integer_exit:\n" )
-	))
+	        "zero_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "zero?_exit:\n" )))
 
+(define gen-number?
+    (lambda()
+        (string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, number?_body\n"
+            "mov [number?], rax\n"
+            "jmp number?_exit\n"
+            
+            "number?_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne number?_finish\n"
 
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "je number?_true\n"
+	        "cmp rax, T_FRACTION\n"
+	        "je number?_true\n"
+	        "mov rax, const_4\n"
+	        "jmp number?_finish\n"
+	        
+	        "number?_true:\n"
+	        "mov rax, const_3\n"
 
+	        "number?_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "number?_exit:\n" )))
 
+(define gen-not
+    (lambda ()
+        (string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, not_body\n"
+            "mov [not], rax\n"
+            "jmp not_exit\n"
+            
+            "not_body:\n"
+            "push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" ; pop n from stack
+	 		"jne not_exit\n"
+            "mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "cmp rax, [const_4]\n"
+	        "je is_false\n"
+	        "mov rax, const_4\n"
+	        "jmp not_finish\n"
+	        "is_false:\n"
+	        "mov rax, const_3\n"
+	        "not_finish:\n"
+	        "leave\n"
+	        "ret\n"
 
-(define cg-integer->char
-  (lambda()
-    (string-append
-     "mov rdi, 16\n"
-     "call malloc\n"
-     "mov rbx, qword 0\n"
-     "MAKE_LITERAL_CLOSURE rax, rbx, integer_to_char_body\n"
-     "mov [L_global24], rax\n"
-     "jmp integer_to_char_exit\n"
+            "not_exit:\n")))
+
+(define gen-car
+    (lambda()
+        (string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, car_body\n"
+            "mov [car], rax\n"
+            "jmp car_exit\n"
+            
+            "car_body:\n"
+            "push rbp\n"
+			"mov rbp, rsp\n"       
+            "mov rax, An(0)\n"
+            "mov rax, [rax]\n"
+            "DATA_UPPER rax\n"
+			"add rax, start_of_data\n"
+            "leave\n"
+            "ret\n"
+            
+            "car_exit:\n")))
+
+(define gen-cdr
+    (lambda()
+        (string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, cdr_body\n"
+            "mov [cdr], rax\n"
+            "jmp cdr_exit\n"
+            
+            "cdr_body:\n"
+            "push rbp\n"
+			"mov rbp, rsp\n"       
+            "mov rax, An(0)\n"
+            "mov rax, [rax]\n"
+            "DATA_LOWER rax\n"
+			"add rax, start_of_data\n"
+            "leave\n"
+            "ret\n"
+            
+            "cdr_exit:\n")))
+
+(define gen-cons
+    (lambda()
+        (string-append
+            
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, cons_body\n"
+            "mov [cons], rax\n"
+            "jmp cons_exit\n"
+            
+            "cons_body:\n"
+            "push rbp\n"
+			"mov rbp, rsp\n"
+			"mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne cons_finish\n"
+            "mov rdi, 8\n"
+            "call malloc\n"
+            "mov rcx, An(0)\n"
+            "mov rdx, An(1)\n"
+            "MAKE_MALLOC_LITERAL_PAIR rax, rcx, rdx\n"
+            "cons_finish:\n"
+        	"leave\n"
+            "ret\n"
+            
+            "cons_exit:\n")))
+
+(define gen-rational?
+ 	(lambda()       
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, rational?_body\n"
+            "mov [rational?], rax\n"
+            "jmp rational?_exit\n"
+            
+            "rational?_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne rational?_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "je rational?_true\n"
+	        "cmp rax, T_FRACTION\n"
+	        "je rational?_true\n"
+	        "mov rax, const_4\n"
+	        "jmp rational?_finish\n"
+	        
+	        "rational?_true:\n"
+	        "mov rax, const_3\n"
+
+	        "rational?_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "rational?_exit:\n" )))
+
+(define gen-eq?
+ 	(lambda()       
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, eq?_body\n"
+            "mov [eq?], rax\n"
+            "jmp eq?_exit\n"
+            
+            "eq?_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne eq?_finish\n"
+
+	 		"mov rax, An(0)\n"
+	 		"mov rax, [rax]\n"
+	 		"mov rbx, An(1)\n"
+	 		"mov rbx, [rbx]\n"
+	        "cmp rax, rbx\n"
+	        "je eq?_true\n"
+	        "mov rax, const_4\n"
+	        "jmp eq?_finish\n"
+	        
+	        "eq?_true:\n"
+	        "mov rax, const_3\n"
+
+	        "eq?_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "eq?_exit:\n" )))
+
+(define gen-bin-equal
+ 	(lambda()       
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_equal_body\n"
+            "mov [bin_equal], rax\n"
+            "jmp bin_equal_exit\n"
+            
+            "bin_equal_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne bin_equal_finish\n"
+
+	 		"mov rax, An(0)\n"
+	 		"mov rax, [rax]\n"
+	 		"mov rcx, rax\n"
+	 		"mov rbx, An(1)\n"
+	 		"mov rbx, [rbx]\n"
+	 		"mov rdx, rbx\n"
+	 		"TYPE rax\n"
+	 		"TYPE rbx\n"
+	        
+	        "cmp rax, T_INTEGER\n"
+	        "jne check_fraction\n"
+	        "cmp rbx, T_INTEGER\n"
+	        "jne bin_equal_false\n"
+	        
+	        "DATA rcx\n"
+	        "DATA rdx\n"
+	        "cmp rcx, rdx\n"
+	        "jne bin_equal_false\n"
+	        "mov rax, const_3\n"
+	        "jmp bin_equal_finish\n"
+
+	        "check_fraction:\n"
+	        "cmp rax, T_FRACTION\n"
+	        "jne bin_equal_finish\n"
+	        "cmp rbx, T_FRACTION\n"
+	        "jne bin_equal_false\n"
+
+	        "mov r8, rcx\n"
+	        "mov r9, rdx\n"
+	        "CAR rcx\n"
+	        "CAR rdx\n"
+	        "cmp rcx, rdx\n"
+	        "jne bin_equal_false\n"
+	        "CDR r8\n"
+	        "CDR r9\n"
+	        "cmp r8, r9\n"
+	        "jne bin_equal_false\n"
+	        "mov rax, const_3\n"
+	        "jmp bin_equal_finish\n"
+
+	        "bin_equal_false:\n"
+	        "mov rax, const_4\n"
+
+	        "bin_equal_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_equal_exit:\n" )))
+
+(define gen-bin-plus
+	(lambda ()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_plus_body\n"
+            "mov [bin_plus], rax\n"
+            "jmp bin_plus_exit\n"
+            
+            "bin_plus_body:\n"
+        	"push rbp\n"
+      		"mov rbp, rsp\n"
+      		"mov rcx ,arg_count\n"
+      		"mov rax ,An(0)\n"                
+
+      		"cmp rcx, 2\n"         			; nil + 1 arguments?
+      		"jne bin_plus_finish\n"
      
-     "integer_to_char_body:\n"
-     "push rbp\n"
-     "mov rbp, rsp\n"         
-     "mov rbx, arg_count\n"
-     "cmp rbx, 1\n" 
-     "jne integer_to_char_finish\n"
-     
-     "mov rax, An(0)\n"
-     "mov rax, [rax]\n"
-     "mov rbx, rax\n"
-     "TYPE rax\n"
-     "cmp rax, T_INTEGER\n"
-     "jne integer_to_char_finish\n"
-     
-     "sub rbx, T_INTEGER\n"
-     "or rbx, T_CHAR\n"
-     
-     "mov rdi,8\n"
-     "call malloc\n"
-     "mov qword [rax], rbx\n"
-     
-     "integer_to_char_finish:\n"
-     "leave\n"
-     "ret\n"
-     "integer_to_char_exit:\n" )
-    ))
+      		"mov rax ,qword [rax]\n"                     
+      		"mov rcx, rax\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_plus_arg1_int_check_arg2\n"
+      
+      		"bin_plus_arg1_frac_check_arg2:\n"
+      		"mov rbx, An(1)\n"
+       		"mov rbx, qword [rbx]\n"                    
+      		"mov rcx, rbx\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"jne bin_plus_arg1_frac_arg2_frac\n"
+      		"mov r10, rax\n"
+      		"mov rax, rbx\n"
+      		"mov rbx, r10\n"
+      		"jmp bin_plus_arg1_int_arg2_frac\n"
+      
+      		"bin_plus_arg1_frac_arg2_frac:\n"
+      		"mov rcx, rax\n"				
+      		"CAR rcx\n"
+      		"DATA rcx\n"					;rcx holds arg1 numerator	
+      		"mov r11, rax\n"      			;rdx keeps rax value
+      		"CDR r11\n"
+      		"DATA r11\n"
+      
+     		"mov r10, rbx\n"					
+      		"CAR r10\n"
+      		"DATA r10\n"					;r10 holds arg2 numerator
+      		"mov r12, rbx\n"				;r12 keeps r10 value
+      		"CDR r12\n"
+      		"DATA r12\n"
+      		"mov r8, r11\n"					;backup first denominator
 
-(define cg-numerator
+      		"MULT r11, r12\n"				;now r11 holds arg1 denominator * arg2 denominator
+      		"MULT rcx, r12\n"				;now rcx holds arg1 numerator * arg2 denominator
+      		"MULT r10, r8\n"				;now r10 holds second numerator * arg1 denominator
+      		"add rcx, r10\n"
+      		"mov rax, rcx\n"	
+      		"mov r12, r11\n"					
+      		"jmp bin_plus_simplify_and_create_fraction\n"                                             
+      		
+		  	"bin_plus_arg1_int_check_arg2:\n"
+		  	"mov rbx, An(1)\n"
+		  	"mov rbx, qword [rbx]\n"                    
+		  	"mov rdx, rbx\n"
+		  	"TYPE rdx\n"
+		  	"cmp rdx, T_INTEGER\n"
+		  	"je bin_plus_arg1_int_arg2_int\n"
+
+		  	"bin_plus_arg1_int_arg2_frac:\n"
+		  	"mov r10, rbx\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n";we will put in r10 second_numerator
+		  	"mov r12, rbx\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n";we will put in r12 second_denominator
+		  	"mov r8,rax\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r12\n"
+		  	"mov rax,r8\n";now rax holds first_numerator*second_denominator
+		  	"add rax,r10\n"
+
+		  	;rax holds new numerator
+		  	;r12 holds new denominator
+		  	"bin_plus_simplify_and_create_fraction:\n"
+		  	"mov r8,  rax\n"
+		  	"mov r9, r12\n"
+		  	"push r9\n"
+		  	"push r8\n"
+		  	"call simplify_fraction\n"
+		  	"add rsp, 16\n"
+		  	"jmp bin_plus_create_new_fraction\n"
+
+		  	"bin_plus_arg1_int_arg2_int:\n"
+		  	"DATA rbx\n" 
+		  	"DATA rax\n"      
+		  	"add rbx,rax\n"
+		  	"shl rbx, 4\n"
+		  	"or rbx, T_INTEGER\n"
+		  	"push rbx\n"
+		  	"mov rdi, 8\n"
+		  	"call malloc\n"
+		  	"pop rbx\n"
+		  	"mov [rax],rbx\n"
+		                        
+		  	"jmp bin_plus_finish\n"                     
+                    
+		  	"bin_plus_create_new_fraction:\n"
+		  	"cmp r9, 1\n"
+		  	"je bin_plus_create_new_int\n"
+
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
+		  	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		    
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "mov rbx, rax\n"
+		    "mov [rbx], r8\n"
+		    "push rbx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop rbx\n"
+		    "mov rcx, rax\n"
+		    "mov [rcx], r9\n"
+		    "push rbx\n"
+		    "push rcx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n" 
+		    "pop rcx\n"
+		    "pop rbx\n"
+                                               
+		  	"MAKE_LITERAL_FRACTION_WITH_REGS rax, rbx, rcx\n"
+		  	"jmp bin_plus_finish\n"
+		          
+		   	"bin_plus_create_new_int:\n"
+
+		   	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"
+		  	"push r8\n"
+
+		  	"mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop r8\n"
+		    "mov [rax], r8\n"
+          
+	        "bin_plus_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_plus_exit:\n")))
+
+(define gen-bin-minus
+	(lambda ()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_minus_body\n"
+            "mov [bin_minus], rax\n"
+            "jmp bin_minus_exit\n"
+            
+            "bin_minus_body:\n"
+        	"push rbp\n"
+      		"mov rbp, rsp\n"
+      		"mov rcx ,arg_count\n"
+      		"mov rax ,An(0)\n"                
+
+      		"cmp rcx, 2\n"         			; nil + 1 arguments?
+      		"jne bin_minus_finish\n"
+     
+      		"mov rax ,qword [rax]\n"                     
+      		"mov rcx, rax\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_minus_arg1_int_check_arg2\n"
+      
+      		"bin_minus_arg1_frac_check_arg2:\n"
+      		"mov rbx, An(1)\n"
+       		"mov rbx, qword [rbx]\n"                    
+      		"mov rcx, rbx\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_minus_arg1_frac_arg2_int\n"
+   
+      		"bin_minus_arg1_frac_arg2_frac:\n"
+      		"mov rcx, rax\n"				
+      		"CAR rcx\n"
+      		"DATA rcx\n"					;rcx holds arg1 numerator	
+      		"mov r11, rax\n"      			;rdx keeps rax value
+      		"CDR r11\n"
+      		"DATA r11\n"
+      
+     		"mov r10, rbx\n"					
+      		"CAR r10\n"
+      		"DATA r10\n"					;r10 holds arg2 numerator
+      		"mov r12, rbx\n"				;r12 keeps r10 value
+      		"CDR r12\n"
+      		"DATA r12\n"
+      		"mov r8, r11\n"					;backup first denominator
+
+      		"MULT r11, r12\n"				;now r11 holds arg1 denominator * arg2 denominator
+      		"MULT rcx, r12\n"				;now rcx holds arg1 numerator * arg2 denominator
+      		"MULT r10, r8\n"				;now r10 holds second numerator * arg1 denominator
+      		"sub rcx, r10\n"
+      		"mov rax, rcx\n"	
+      		"mov r12, r11\n"					
+      		"jmp bin_minus_simplify_and_create_fraction\n"                                             
+      		
+		  	"bin_minus_arg1_int_check_arg2:\n"
+		  	"mov rbx, An(1)\n"
+		  	"mov rbx, qword [rbx]\n"                    
+		  	"mov rdx, rbx\n"
+		  	"TYPE rdx\n"
+		  	"cmp rdx, T_INTEGER\n"
+		  	"je bin_minus_arg1_int_arg2_int\n"
+
+		  	"bin_minus_arg1_int_arg2_frac:\n"
+		  	"mov r10, rbx\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n";we will put in r10 second_numerator
+		  	"mov r12, rbx\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n";we will put in r12 second_denominator
+		  	"mov r8,rax\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r12\n"
+		  	"mov rax,r8\n";now rax holds first_numerator*second_denominator
+		  	"sub rax,r10\n"
+		  	"jmp bin_minus_simplify_and_create_fraction\n"
+
+		  	"bin_minus_arg1_frac_arg2_int:\n"
+		  	"mov r10, rax\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n"
+		  	"mov r12, rax\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n"
+		  	"mov r8,rbx\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r12\n"
+		  	"mov rax,r8\n";now rax holds first_numerator*second_denominator
+		  	"sub r10, rax\n"
+		  	"mov rax, r10\n"
+
+		  	;rax holds new numerator
+		  	;r12 holds new denominator
+		  	"bin_minus_simplify_and_create_fraction:\n"
+		  	"mov r8,  rax\n"
+		  	"mov r9, r12\n"
+		  	"push r9\n"
+		  	"push r8\n"
+		  	"call simplify_fraction\n"
+		  	"add rsp, 16\n"
+		  	"jmp bin_minus_create_new_fraction\n"
+
+		  	"bin_minus_arg1_int_arg2_int:\n"
+		  	"DATA rbx\n" 
+		  	"DATA rax\n"      
+		  	"sub rax, rbx\n"
+		  	"mov r10, rax\n"
+		  	"shl r10, 4\n"
+		  	"or r10, T_INTEGER\n"
+		  	"push r10\n"
+		  	"mov rdi, 8\n"
+		  	"call malloc\n"
+		  	"pop r10\n"
+		  	"mov [rax],r10\n"
+		                        
+		  	"jmp bin_minus_finish\n"                     
+                    
+		  	"bin_minus_create_new_fraction:\n"
+		  	"cmp r9, 1\n"
+		  	"je bin_minus_create_new_int\n"
+
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
+		  	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		    
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "mov rbx, rax\n"
+		    "mov [rbx], r8\n"
+		    "push rbx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop rbx\n"
+		    "mov rcx, rax\n"
+		    "mov [rcx], r9\n"
+		    "push rbx\n"
+		    "push rcx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n" 
+		    "pop rcx\n"
+		    "pop rbx\n"
+                                              
+		  	"MAKE_LITERAL_FRACTION_WITH_REGS rax, rbx, rcx\n"      
+		  	"jmp bin_minus_finish\n"
+		          
+		   	"bin_minus_create_new_int:\n"
+
+		   	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"
+		  	"push r8\n"
+
+		  	"mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop r8\n"
+		    "mov [rax], r8\n"
+          
+	        "bin_minus_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_minus_exit:\n")))
+
+(define gen-bin-mul
+	(lambda ()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_mul_body\n"
+            "mov [bin_mul], rax\n"
+            "jmp bin_mul_exit\n"
+            
+            "bin_mul_body:\n"
+        	"push rbp\n"
+      		"mov rbp, rsp\n"
+      		"mov rcx ,arg_count\n"
+      		"mov rax ,An(0)\n"                
+
+      		"cmp rcx, 2\n"         			; nil + 1 arguments?
+      		"jne bin_mul_finish\n"
+     
+      		"mov rax ,qword [rax]\n"                     
+      		"mov rcx, rax\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_mul_arg1_int_check_arg2\n"
+      
+      		"bin_mul_arg1_frac_check_arg2:\n"
+      		"mov rbx, An(1)\n"
+       		"mov rbx, qword [rbx]\n"                    
+      		"mov rcx, rbx\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"jne bin_mul_arg1_frac_arg2_frac\n"
+      		"mov r10, rax\n"
+      		"mov rax, rbx\n"
+      		"mov rbx, r10\n"
+      		"jmp bin_mul_arg1_int_arg2_frac\n"
+      
+      		"bin_mul_arg1_frac_arg2_frac:\n"
+      		"mov rcx, rax\n"				
+      		"CAR rcx\n"
+      		"DATA rcx\n"					;rcx holds arg1 numerator	
+      		"mov r11, rax\n"      			;rdx keeps rax value
+      		"CDR r11\n"
+      		"DATA r11\n"
+      
+     		"mov r10, rbx\n"					
+      		"CAR r10\n"
+      		"DATA r10\n"					;r10 holds arg2 numerator
+      		"mov r12, rbx\n"				;r12 keeps r10 value
+      		"CDR r12\n"
+      		"DATA r12\n"
+      		"mov r8, r11\n"					;backup first denominator
+
+      		"MULT r11, r12\n"				;now r11 holds arg1 denominator * arg2 denominator
+      		"MULT r10, rcx\n"				;now r10 holds arg1 numerator * arg2 numerator
+      		"mov rax, r10\n"	
+      		"mov r12, r11\n"					
+      		"jmp bin_mul_simplify_and_create_fraction\n"                                             
+      		
+		  	"bin_mul_arg1_int_check_arg2:\n"
+		  	"mov rbx, An(1)\n"
+		  	"mov rbx, qword [rbx]\n"                    
+		  	"mov rdx, rbx\n"
+		  	"TYPE rdx\n"
+		  	"cmp rdx, T_INTEGER\n"
+		  	"je bin_mul_arg1_int_arg2_int\n"
+
+		  	"bin_mul_arg1_int_arg2_frac:\n"
+		  	"mov r10, rbx\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n";we will put in r10 second_numerator
+		  	"mov r12, rbx\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n";we will put in r12 second_denominator
+		  	"mov r8,rax\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r10\n"
+		  	
+		  	"mov rax,r8\n";now rax holds first_numerator*second_numerator
+
+		  	;rax holds new numerator
+		  	;r12 holds new denominator
+		  	"bin_mul_simplify_and_create_fraction:\n"
+		  	"mov r8,  rax\n"
+		  	"mov r9, r12\n"
+		  	"push r9\n"
+		  	"push r8\n"
+		  	"call simplify_fraction\n"
+		  	"add rsp, 16\n"
+		  	"jmp bin_mul_create_new_fraction\n"
+
+		  	"bin_mul_arg1_int_arg2_int:\n"
+		  	"DATA rbx\n" 
+		  	"DATA rax\n"
+		  	"mov r10, rax\n"     
+		  	"MULT rbx,r10\n"
+		  	"shl rbx, 4\n"
+		  	"or rbx, T_INTEGER\n"
+		  	"push rbx\n"
+		  	"mov rdi, 8\n"
+		  	"call malloc\n"
+		  	"pop rbx\n"
+		  	"mov [rax],rbx\n"
+		                        
+		  	"jmp bin_mul_finish\n"                     
+                    
+		  	"bin_mul_create_new_fraction:\n"
+		  	"cmp r9, 1\n"
+		  	"je bin_mul_create_new_int\n"
+
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
+		  	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		    
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "mov rbx, rax\n"
+		    "mov [rbx], r8\n"
+		    "push rbx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop rbx\n"
+		    "mov rcx, rax\n"
+		    "mov [rcx], r9\n"
+		    "push rbx\n"
+		    "push rcx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n" 
+		    "pop rcx\n"
+		    "pop rbx\n"
+                                               
+		  	"MAKE_LITERAL_FRACTION_WITH_REGS rax, rbx, rcx\n"
+		  	"jmp bin_mul_finish\n"
+		          
+		   	"bin_mul_create_new_int:\n"
+
+		   	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"
+		  	"push r8\n"
+
+		  	"mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop r8\n"
+		    "mov [rax], r8\n"
+          
+	        "bin_mul_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_mul_exit:\n")))
+
+(define gen-bin-div
+	(lambda ()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_div_body\n"
+            "mov [bin_div], rax\n"
+            "jmp bin_div_exit\n"
+            
+            "bin_div_body:\n"
+        	"push rbp\n"
+      		"mov rbp, rsp\n"
+      		"mov rcx ,arg_count\n"
+      		"mov rax ,An(0)\n"                
+
+      		"cmp rcx, 2\n"         			; nil + 1 arguments?
+      		"jne bin_div_finish\n"
+     
+      		"mov rax ,qword [rax]\n"                     
+      		"mov rcx, rax\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_div_arg1_int_check_arg2\n"
+      
+      		"bin_div_arg1_frac_check_arg2:\n"
+      		"mov rbx, An(1)\n"
+       		"mov rbx, qword [rbx]\n"                    
+      		"mov rcx, rbx\n"
+      		"TYPE rcx\n"
+      		"cmp rcx, T_INTEGER\n"
+      		"je bin_div_arg1_frac_arg2_int\n"
+      
+      		"bin_div_arg1_frac_arg2_frac:\n"
+      		"mov rcx, rax\n"				
+      		"CAR rcx\n"
+      		"DATA rcx\n"					;rcx holds arg1 numerator	
+      		"mov r11, rax\n"      			;rdx keeps rax value
+      		"CDR r11\n"
+      		"DATA r11\n"
+      
+     		"mov r10, rbx\n"					
+      		"CAR r10\n"
+      		"DATA r10\n"					;r10 holds arg2 numerator
+      		"mov r12, rbx\n"				;r12 keeps r10 value
+      		"CDR r12\n"
+      		"DATA r12\n"
+      		"mov r8, r11\n"					;backup first denominator
+
+      		"MULT rcx, r12\n"				;now rcx holds arg1 numerator * arg2 denominator
+      		"MULT r11, r10\n"				;now r11 holds arg1 denominator * arg2 numerator
+      		"cmp r11, 0\n"
+		  	"jg bin_div_positive_int1\n"
+		  	"neg r11\n"
+		  	"neg rcx\n"
+		  	"bin_div_positive_int1:\n"
+      		"mov rax, rcx\n"	
+      		"mov r12, r11\n"					
+      		"jmp bin_div_simplify_and_create_fraction\n"                                             
+      		
+		  	"bin_div_arg1_int_check_arg2:\n"
+		  	"mov rbx, An(1)\n"
+		  	"mov rbx, qword [rbx]\n"                    
+		  	"mov rdx, rbx\n"
+		  	"TYPE rdx\n"
+		  	"cmp rdx, T_INTEGER\n"
+		  	"je bin_div_arg1_int_arg2_int\n"
+
+		  	"bin_div_arg1_int_arg2_frac:\n"
+		  	"mov r10, rbx\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n";we will put in r10 second_numerator
+		  	"mov r12, rbx\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n";we will put in r12 second_denominator
+		  	"mov r8,rax\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r12\n"
+		  	"cmp r10, 0\n"
+		  	"jg bin_div_positive_int2\n"
+		  	"neg r10\n"
+		  	"neg r8\n"
+		  	"bin_div_positive_int2:\n"
+		  	"mov r12, r10\n"
+		  	"mov rax,r8\n"
+		  	"jmp bin_div_simplify_and_create_fraction\n"
+
+		  	"bin_div_arg1_frac_arg2_int:\n"
+		  	"mov r10, rax\n"
+		  	"CAR r10\n"
+		  	"DATA r10\n"
+		  	"mov r12, rax\n"
+		  	"CDR r12\n"
+		  	"DATA r12\n"
+		  	"mov r8,rbx\n"
+		  	"DATA r8\n"
+		  	"MULT r8,r12\n"
+		  	"cmp r8, 0\n"
+		  	"jg bin_div_positive_int3\n"
+		  	"neg r8\n"
+		  	"neg r10\n"
+		  	"bin_div_positive_int3:\n"
+		  	"mov rax,r8\n";now rax holds first_denominator*second_denominator
+		  	"mov r11, rax\n"
+		  	"mov rax, r10\n"
+		  	"mov r12, r11\n"
+
+
+		  	;rax holds new numerator
+		  	;r12 holds new denominator
+		  	"bin_div_simplify_and_create_fraction:\n"
+		  	"mov r8,  rax\n"
+		  	"mov r9, r12\n"
+		  	"push r9\n"
+		  	"push r8\n"
+		  	"call simplify_fraction\n"
+		  	"add rsp, 16\n"
+		  	"jmp bin_div_create_new_fraction\n"
+
+		  	"bin_div_arg1_int_arg2_int:\n"
+		  	"DATA rax\n"
+		  	"DATA rbx\n"
+		  	"mov r12, rbx\n"
+		  	"cmp r12, 0\n"
+		  	"jg bin_div_positive_int4\n"
+		  	"neg r12\n"
+		  	"neg rax\n"
+		  	"bin_div_positive_int4:\n" 
+		  	"jmp bin_div_simplify_and_create_fraction\n"
+		                                
+		  	"bin_div_create_new_fraction:\n"
+		  	"cmp r9, 1\n"
+		  	"je bin_div_create_new_int\n"
+
+		  	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"		;r8 holds numerator in data structure
+		  	"shl r9, 4\n"
+		  	"or r9, T_INTEGER\n"		;r9 holds denominator in data structure
+		    
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "mov rbx, rax\n"
+		    "mov [rbx], r8\n"
+		    "push rbx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop rbx\n"
+		    "mov rcx, rax\n"
+		    "mov [rcx], r9\n"
+		    "push rbx\n"
+		    "push rcx\n"
+
+		    "mov rdi, 8\n"
+		    "call malloc\n" 
+		    "pop rcx\n"
+		    "pop rbx\n"
+                                               
+		  	"MAKE_LITERAL_FRACTION_WITH_REGS rax, rbx, rcx\n"
+		  	"jmp bin_div_finish\n"
+		          
+		   	"bin_div_create_new_int:\n"
+
+		   	"shl r8, 4\n"
+		  	"or r8, T_INTEGER\n"
+		  	"push r8\n"
+
+		  	"mov rdi, 8\n"
+		    "call malloc\n"
+		    "pop r8\n"
+		    "mov [rax], r8\n"
+          
+	        "bin_div_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_div_exit:\n")))
+
+(define gen-bin-less-than
+ 	(lambda()       
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_less_than_body\n"
+            "mov [bin_less_than], rax\n"
+            "jmp bin_less_than_exit\n"
+            
+            "bin_less_than_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne bin_less_than_finish\n"
+
+	 		;"push const_2\n"
+	 		"push An(1)\n"
+	 		"push An(0)\n"
+	 		"push 2\n"
+	 		"push qword 0\n"
+	 		"call bin_minus_body\n"
+	 		"mov rax, [rax]\n"
+	 		"mov rbx, rax\n"
+	 		"TYPE rbx\n"
+	 		"cmp rbx, T_INTEGER\n"
+	 		"je check_sign\n"
+	 		"CAR rax\n"
+
+	 		"check_sign:\n"
+	 		"DATA rax\n"
+	 		"cmp rax, 0\n"
+	 		"jl bin_less_than_true\n"
+	        
+	        "mov rax, const_4\n"
+	        "jmp bin_less_than_finish\n"
+
+	        "bin_less_than_true:\n"
+	        "mov rax, const_3\n"
+
+	        "bin_less_than_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_less_than_exit:\n" )))
+
+(define gen-bin-greater-than
+ 	(lambda()       
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, bin_greater_than_body\n"
+            "mov [bin_greater_than], rax\n"
+            "jmp bin_greater_than_exit\n"
+            
+            "bin_greater_than_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne bin_greater_than_finish\n"
+
+	 		;"push const_2\n"
+	 		"push An(1)\n"
+	 		"push An(0)\n"
+	 		"push 2\n"
+	 		"push qword 0\n"
+	 		"call bin_minus_body\n"
+	 		"mov rax, [rax]\n"
+	 		"mov rbx, rax\n"
+	 		"TYPE rbx\n"
+	 		"cmp rbx, T_INTEGER\n"
+	 		"je bin_greater_than_check_sign\n"
+	 		"CAR rax\n"
+
+	 		"bin_greater_than_check_sign:\n"
+	 		"DATA rax\n"
+	 		"cmp rax, 0\n"
+	 		"jg bin_greater_than_true\n"
+	        
+	        "mov rax, const_4\n"
+	        "jmp bin_greater_than_finish\n"
+
+	        "bin_greater_than_true:\n"
+	        "mov rax, const_3\n"
+
+	        "bin_greater_than_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "bin_greater_than_exit:\n" )))
+
+(define gen-char->integer
 	(lambda()
-		(string-append "" )
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, char_to_integer_body\n"
+            "mov [char_to_integer], rax\n"
+            "jmp char_to_integer_exit\n"
+            
+            "char_to_integer_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne char_to_integer_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_CHAR\n"
+	        "jne char_to_integer_finish\n"
+
+	        "sub rbx, T_CHAR\n"
+	        "or rbx, T_INTEGER\n"
+
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "mov qword [rax], rbx\n"
+
+	        "char_to_integer_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "char_to_integer_exit:\n" )
 	))
 
+(define gen-integer->char
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, integer_to_char_body\n"
+            "mov [integer_to_char], rax\n"
+            "jmp integer_to_char_exit\n"
+            
+            "integer_to_char_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne integer_to_char_finish\n"
 
-(define cg-denominator
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "jne integer_to_char_finish\n"
+
+	        "sub rbx, T_INTEGER\n"
+	        "or rbx, T_CHAR\n"
+
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "mov qword [rax], rbx\n"
+
+	        "integer_to_char_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "integer_to_char_exit:\n" )
+	))
+
+(define gen-numerator
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, numerator_body\n"
+            "mov [numerator], rax\n"
+            "jmp numerator_exit\n"
+            
+            "numerator_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne numerator_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "je get_integer_numerator\n"
+	        "cmp rax, T_FRACTION\n"
+	        "jne numerator_finish\n"
+	        "mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+
+	        "DATA_UPPER rax\n"
+			"add rax, start_of_data\n"
+	        "jmp numerator_finish\n"
+
+	        "get_integer_numerator:\n"
+	        "mov rax, An(0)\n"
+
+	        "numerator_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "numerator_exit:\n" )
+	))
+
+(define gen-denominator
 	(lambda()
 		(string-append
             "mov rdi, 16\n"
             "call malloc\n"
             "mov rbx, qword 0\n"
             "MAKE_LITERAL_CLOSURE rax, rbx, denominator_body\n"
-            "mov [L_global22], rax\n"
+            "mov [denominator], rax\n"
             "jmp denominator_exit\n"
             
             "denominator_body:\n"
@@ -1661,154 +2217,637 @@
 	        "denominator_exit:\n" )
 	))
 
-(define cg-eq
+(define gen-remainder
  	(lambda()       
 		(string-append
-		 "mov rdi, 16\n"
-		 "call malloc\n"
-		 "mov rbx, qword 0\n"
-		 "MAKE_LITERAL_CLOSURE rax, rbx, eq_body\n"
-		 "mov [L_global13], rax\n"
-		 "jmp eq_exit\n"
-		 
-		 "eq_body:\n"
-		 "push rbp\n"
-		 "mov rbp, rsp\n"         
-		 "mov rbx, arg_count\n"
-		 "cmp rbx, 2\n" 
-		 "jne eq_finish\n"
-		 
-		 "mov rax, An(0)\n"
-		 "mov rax, [rax]\n"
-		 "mov rbx, An(1)\n"
-		 "mov rbx, [rbx]\n"
-		 "cmp rax, rbx\n"
-		 "je eq_true\n"
-		 "mov rax, L_const2\n"
-		 "jmp eq_finish\n"
-		 
-		 "eq_true:\n"
-		 "mov rax, L_const4\n"
-		 
-		 "eq_finish:\n"
-		 "leave\n"
-		 "ret\n"
-		 "eq_exit:\n" )))
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, remainder_body\n"
+            "mov [remainder], rax\n"
+            "jmp remainder_exit\n"
+            
+            "remainder_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne remainder_finish\n"
 
+	 		"mov rax, An(0)\n"
+	 		"mov rax, [rax]\n"
+	 		"mov rcx, rax\n"
+	 		"mov rbx, An(1)\n"
+	 		"mov rbx, [rbx]\n"
+	 		"mov r10, rbx\n"
+	 		"TYPE rcx\n"
+	        "cmp rcx, T_INTEGER\n"
+	        "jne remainder_finish\n"
+	        "TYPE rbx\n"
+	        "cmp rbx, T_INTEGER\n"
+	        "jne remainder_finish\n"
+	        "DATA rax\n"
+	        "mov r9, rax\n"
+	        "DATA r10\n"
+	        "mov rdx, qword 0\n"
+	      
+	        "cmp r9, 0\n"
+	        "jge is_not_negative1\n"
+	        "neg rax\n"
+	        "is_not_negative1:\n"
+	        "mov rdx, qword 0\n"
+	        "idiv r10\n"
+	        "cmp r9, 0\n"
+	        "jge is_not_negative2\n"
+	        "neg rdx\n"
+	        "is_not_negative2:\n"
 
+	        "shl rdx, TYPE_BITS\n"
+	        "add rdx, T_INTEGER\n"
+	        "push rdx\n"
+	        "mov rdi, 8\n"
+	        "call malloc\n"
+	        "pop rdx\n"
+	        "mov [rax], rdx\n"
+	        
+	        "remainder_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "remainder_exit:\n" )))
 
-(define cg-make-string
+(define gen-string-length
 	(lambda()
-		(string-append "" )))
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, string_length_body\n"
+            "mov [string_length], rax\n"
+            "jmp string_length_exit\n"
+            
+            "string_length_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne string_length_finish\n"
 
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx,rax\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_STRING\n"
+	        "jne string_length_finish\n"
+	        "STRING_LENGTH rbx\n"
+	        "shl rbx, TYPE_BITS\n"
+	        "add rbx, T_INTEGER\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "mov [rax], rbx\n"
 
+	        "string_length_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "string_length_exit:\n" )
+	))
 
-
-(define cg-make-vector
+(define gen-vector-length
 	(lambda()
-		(string-append "" )))
-	
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, vector_length_body\n"
+            "mov [vector_length], rax\n"
+            "jmp vector_length_exit\n"
+            
+            "vector_length_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 1\n" 
+	 		"jne vector_length_finish\n"
 
-	(define cg-remainder
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx,rax\n"
+	        "TYPE rax\n"
+	        "cmp rax, T_VECTOR\n"
+	        "jne vector_length_finish\n"
+	        "VECTOR_LENGTH rbx\n"
+	        "shl rbx, TYPE_BITS\n"
+	        "add rbx, T_INTEGER\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "mov [rax], rbx\n"
+
+	        "vector_length_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "vector_length_exit:\n" )
+	))
+
+(define gen-string-ref
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, string_ref_body\n"
+            "mov [string_ref], rax\n"
+            "jmp string_ref_exit\n"
+            
+            "string_ref_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne string_ref_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        
+	        "mov rcx, An(1)\n"
+	        "mov rcx, [rcx]\n"
+	        "mov rdx, rcx\n"
+	        "DATA rdx\n"
+
+	        "TYPE rax\n"
+	        "cmp rax, T_STRING\n"
+	        "jne string_ref_finish\n"
+
+	        "TYPE rcx\n"
+	        "cmp rcx, T_INTEGER\n"
+	        "jne string_ref_finish\n"
+
+	        "STRING_REF cl, rbx, rdx\n"
+	        "shl rcx, TYPE_BITS\n"
+	        "add rcx, T_CHAR\n"
+	        "push rcx\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "pop rcx\n"
+	        "mov [rax], rcx\n"
+
+	        "string_ref_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "string_ref_exit:\n" )))
+
+(define gen-vector-ref
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, vector_ref_body\n"
+            "mov [vector_ref], rax\n"
+            "jmp vector_ref_exit\n"
+            
+            "vector_ref_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 2\n" 
+	 		"jne vector_ref_finish\n"
+
+	 		"mov rax, An(0)\n"
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        
+	        "mov rcx, An(1)\n"
+	        "mov rcx, [rcx]\n"
+	        "mov rdx, rcx\n"
+	        "DATA rdx\n"
+
+	        "TYPE rax\n"
+	        "cmp rax, T_VECTOR\n"
+	        "jne vector_ref_finish\n"
+
+	        "TYPE rcx\n"
+	        "cmp rcx, T_INTEGER\n"
+	        "jne vector_ref_finish\n"
+
+	        "VECTOR_REF rcx, rbx, rdx\n"
+	        "push rcx\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "pop rcx\n"
+	        "mov [rax], rcx\n"
+
+	        "vector_ref_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "vector_ref_exit:\n" )))
+
+(define gen-string-set
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, string_set_body\n"
+            "mov [string_set], rax\n"
+            "jmp string_set_exit\n"
+            
+            "string_set_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 3\n" 
+	 		"jne string_set_finish\n"
+
+	 		"mov rax, An(0)\n" ;string	        
+	        
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n" 
+
+	        "mov r11, An(1)\n" ;index
+	        "mov r11, [r11]\n"
+	        "mov rdx, r11\n"
+	        "DATA rdx\n"
+
+	       	"mov r10, An(2)\n" ;char
+	        "mov r10, [r10]\n"
+	        "mov rcx, r10\n"
+	        "DATA rcx\n"
+
+	        "TYPE rax\n"
+	        "cmp rax, T_STRING\n"
+	        "jne string_set_finish\n"
+
+	        "TYPE r11\n"
+	        "cmp r11, T_INTEGER\n"
+	        "jne string_set_finish\n"
+
+	       	"TYPE r10\n"
+	        "cmp r10, T_CHAR\n"
+	        "jne string_set_finish\n"
+
+	        ;rbx=string, rdx=index, rcx=char
+
+	        "mov r12, rbx\n"
+	        "STRING_ELEMENTS rbx\n"
+			"add rbx, rdx\n"
+			"mov byte [rbx], cl\n"
+
+	        "mov rax, const_1\n"
+
+	        "string_set_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "string_set_exit:\n" )))
+
+(define gen-vector-set
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, vector_set_body\n"
+            "mov [vector_set], rax\n"
+            "jmp vector_set_exit\n"
+            
+            "vector_set_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+	        "cmp rbx, 3\n" 
+	 		"jne vector_set_finish\n"
+
+	 		"mov rax, An(0)\n" ;vector	        
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n" 
+
+	        "mov r11, An(1)\n" ;index
+	        "mov r11, [r11]\n"
+	        "mov rdx, r11\n"
+	        "DATA rdx\n"
+
+	       	"mov rcx, An(2)\n" ;address of item
+
+	        "TYPE rax\n"
+	        "cmp rax, T_VECTOR\n"
+	        "jne vector_set_finish\n"
+
+	        "TYPE r11\n"
+	        "cmp r11, T_INTEGER\n"
+	        "jne vector_set_finish\n"
+
+	        ;rbx=vector, rdx=index, rcx=item
+
+	        "mov r12, rbx\n"
+	        "VECTOR_ELEMENTS r12\n"
+	        "mov [r12 + rdx*8], rcx\n"
+
+	        "mov rax, const_1\n"
+
+	        "vector_set_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "vector_set_exit:\n" )))
+
+(define gen-make-string
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, make_string_body\n"
+            "mov [make_string], rax\n"
+            "jmp make_string_exit\n"
+            
+            "make_string_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"
+			"mov rdx, qword 0\n" ;initialize char with 0         
+            "mov r9, arg_count\n"
+	        "cmp r9, 2\n"
+	 		"jg make_string_finish\n"
+
+	 		"mov rax, An(0)\n" ;length of string	        
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        "DATA rbx\n" 
+
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "jne make_string_finish\n"
+
+	        "cmp r9, 1\n"
+	        "je start_creating_string\n"
+
+	        "mov rcx, An(1)\n" ;char
+	        "mov rcx, [rcx]\n"
+	        "mov rdx, rcx\n"
+	        "DATA rdx\n"
+
+	        "TYPE rcx\n"
+	        "cmp rcx, T_CHAR\n"
+	        "jne make_string_finish\n"
+
+	        "start_creating_string:\n"
+
+	        "push rbx\n"
+	        "push rdx\n"
+	        "mov rdi, rbx\n"
+	        "call malloc\n"
+	        "pop rdx\n"
+	        "pop rbx\n"
+
+ 
+	        ;rax= pointer to address of rbx bytes, rbx=length of string, rdx=char
+	        "mov r10, 0\n" ;counter
+
+	        "for_create_string:\n"
+	        "cmp r10, rbx\n"
+	        "je end_of_create_string\n"
+	        "mov byte [rax+r10], dl\n"
+	        "inc r10\n"
+	        "jmp for_create_string\n"
+	        "end_of_create_string:\n"
+
+	        "mov rcx, rax\n"
+
+	        "MAKE_LITERAL_STRING_WITH_REGS rcx, rbx\n" ;at the end of macro, rax is a literal string
+	        "mov rcx, rax\n"
+	        "push rcx\n"
+	        "mov rdi, 8\n"
+	        "call malloc\n"
+	        "pop rcx\n"
+
+	        "mov [rax], rcx\n"
+
+	        "make_string_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "make_string_exit:\n" )))
+
+(define gen-make-vector
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, make_vector_body\n"
+            "mov [make_vector], rax\n"
+            "jmp make_vector_exit\n"
+            
+            "make_vector_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"  
+			;initialize item with 0
+			"mov rdi, 8\n"
+			"call malloc\n"
+			"mov rdx, 0\n"
+			"shl rdx, TYPE_BITS\n"
+	        "add rdx, T_INTEGER\n"       
+            "mov rbx, arg_count\n"
+            "mov [rax], rdx\n" 
+            "mov rdx, rax\n" ;now rdx conatins integer 0
+	        "cmp rbx, 2\n" 
+	 		"jg make_vector_finish\n"
+
+	 		"mov rax, An(0)\n" ;length of vector	        
+	        "mov rax, [rax]\n"
+	        "mov rbx, rax\n"
+	        "DATA rbx\n" 
+
+	        "TYPE rax\n"
+	        "cmp rax, T_INTEGER\n"
+	        "jne make_vector_finish\n"
+
+	        "mov r9, arg_count\n"
+	        "cmp r9, 1\n"
+	        "je start_creating_vector\n"
+	        "mov rdx, An(1)\n" ; address of item
+
+	        "start_creating_vector:\n"
+
+	        "push rbx\n"
+	        "push rdx\n"
+	        "shl rbx, 3\n"
+	        "mov rdi, rbx\n"
+	        "call malloc\n"
+	        "pop rdx\n"
+	        "pop rbx\n"
+ 
+	        ;rax= pointer to address of rbx*8 bytes, rbx=length of vector, rdx=address of item
+	        "mov r10, 0\n" ;counter
+
+	        "for_create_vector:\n"
+	        "cmp r10, rbx\n"
+	        "je end_of_create_vector\n"
+	        "mov qword [rax+r10*8], rdx\n"
+	        "inc r10\n"
+	        "jmp for_create_vector\n"
+	        "end_of_create_vector:\n"
+
+	        "mov rcx, rax\n"
+	        "shl rbx, 3\n"
+	        "MAKE_LITERAL_VECTOR_WITH_REGS rcx, rbx\n" ;at the end of macro, rax is a literal vector
+	        "mov rcx, rax\n"
+	        "push rcx\n"
+	        "mov rdi, 8\n"
+	        "call malloc\n"
+	        "pop rcx\n"
+	        "mov [rax], rcx\n"
+
+	        "make_vector_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "make_vector_exit:\n" )))
+
+(define gen-vector
+	(lambda()
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, custom_vector_body\n"
+            "mov [custom_vector], rax\n"
+            "jmp custom_vector_exit\n"
+            
+            "custom_vector_body:\n"
+        	"push rbp\n"
+			"mov rbp, rsp\n"         
+            "mov rbx, arg_count\n"
+
+	        "push rbx\n"
+	        "shl rbx, 3\n"
+	        "mov rdi, rbx\n"
+	        "call malloc\n"
+	        "pop rbx\n"
+ 
+	        ;rax= pointer to address of rbx*8 bytes, rbx=length of vector
+	        "mov r10, 0\n" ;counter
+	        "for_vector:\n"
+	        "cmp r10, rbx\n"
+	        "je end_of_vector\n"
+
+	        "mov rdx, An(r10)\n" 
+	        "mov qword [rax+r10*8], rdx\n"
+	        "inc r10\n"
+	        "jmp for_vector\n"
+	        "end_of_vector:\n"
+
+	        "mov rcx, rax\n"
+	        "shl rbx, 3\n"
+	        "MAKE_LITERAL_VECTOR_WITH_REGS rcx, rbx\n" ;at the end of macro, rax is a literal vector
+	        "mov rcx, rax\n"
+	        "push rcx\n"
+	        "mov rdi, 8\n"
+	        "call malloc\n"
+	        "pop rcx\n"
+	        "mov [rax], rcx\n"
+
+	        "custom_vector_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "custom_vector_exit:\n" )))
+
+(define gen-apply
  	(lambda()       
-		(string-append "")))
+		(string-append
+            "mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, apply_body\n"
+            "mov [apply], rax\n"
+            "jmp apply_exit\n"
+            
+            "apply_body:\n"
+    		"push rbp\n"
+            "mov rbp, rsp\n"
+	        "mov rax, An(0)\n"				;closure
+	        "mov rax, qword [rax]\n"
+	        "mov r10, qword [rbp]\n" 		;old rbp
+	        "mov r11,qword [rbp+8]\n" 		;ret addr
+	        "mov r12, rbp\n"
+	        "add r12, 5*8\n"
+	        
+	        "mov rbx, rax\n" 
+	        "TYPE rbx\n"
+	        "cmp rbx, T_CLOSURE\n"
+	        "jne apply_finish\n"
+	         
+	        "mov rcx, An(1)\n"
+	        "mov rcx, qword [rcx]\n"
+	        "mov rbx, rcx\n"
+	        "TYPE rbx\n"
+	        "cmp rbx, T_PAIR\n"
+	        "je apply_start\n"
+
+	        "cmp rbx, T_NIL\n"
+	        "jne apply_finish\n"
+
+	        "apply_start:\n"
+	        "mov rsi, 0\n"
+
+		    "apply_calculate_list_length:\n"
+		    "cmp rbx, T_NIL\n"
+		    "je apply_calculate_list_length_done\n"
+		    "CDR rcx\n"
+		    "mov rbx, rcx\n"
+		    "TYPE rbx\n"
+		    "inc rsi\n"
+		    "jmp apply_calculate_list_length\n"
+
+	        "apply_calculate_list_length_done:\n"
+	        "shl rsi, 3\n"
+	        "sub r12, rsi\n"
+	        "shr rsi, 3\n"
+	        
+	        "mov rdi, 0\n"
+	        "mov rcx, An(1)\n"  			 
+	        "mov rcx, qword [rcx]\n"
+
+	        "apply_loop:\n"
+
+	        "cmp rdi, rsi\n"
+	        "je apply_loop_exit\n"
+	        "mov rbx, rcx\n"
+	        "DATA_UPPER rbx\n"
+			"add rbx, start_of_data\n"    
+	        "mov qword [r12 + 8*rdi], rbx\n"
+	        "CDR rcx\n"
+	        "inc rdi\n"
+	        "jmp apply_loop\n"
+	        
+	        "apply_loop_exit:\n"
+
+	        "sub r12, 8\n"
+	        "mov qword [r12],rsi\n"
+	        "sub r12, 8\n"
+	        "mov rbx, rax\n"
+	        "CLOSURE_ENV rbx\n"
+	        "mov qword [r12], rbx\n"
+	        "sub r12, 8\n"
+	        "mov qword [r12], r11\n"
+	        "mov rsp, r12\n"	        
+	        "mov rbp, r10\n"
+	        "mov rbx, rax\n"
+	        "TYPE rbx\n"
+	        
+	        "cmp rbx, T_CLOSURE\n"
+	        "jne apply_finish\n"
+	        "CLOSURE_CODE rax\n"
+	        "jmp rax\n"
+	        "apply_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "apply_exit:\n" )))
 
 
-
-(define cg-string-length
-  (lambda()
-    (string-append "")
-    ))
-
-
-
-(define cg-string-ref
-	(lambda()
-		(string-append "" )))
-
-
-
-(define cg-string-set
-	(lambda()
-		(string-append "" )))
-
-
-
-(define cg-vector-set
-  (lambda()
-    (string-append "")))
-
-(define cg-bin-minus
-  (lambda ()
-    (string-append "")))
-
-
-(define cg-less-than
-  (lambda()       
-    (string-append "" )))
-
-
-
-(define cg-eq?
- 	(lambda()       
-	  (string-append
-	   "mov rdi, 16\n"
-	   "call malloc\n"
-	   "mov rbx, qword 0\n"
-	   "MAKE_LITERAL_CLOSURE rax, rbx, eq?_body\n"
-	   "mov [L_global23], rax\n"
-	   "jmp eq?_exit\n"
-	   
-	   "eq?_body:\n"
-	   "push rbp\n"
-	   "mov rbp, rsp\n"         
-	   "mov rbx, arg_count\n"
-	   "cmp rbx, 2\n" 
-	   "jne eq?_finish\n"
-	   
-	   "mov rax, An(0)\n"
-	   "mov rax, [rax]\n"
-	   "mov rbx, An(1)\n"
-	   "mov rbx, [rbx]\n"
-	   "cmp rax, rbx\n"
-	   "je eq?_true\n"
-	   "mov rax, L_const2\n"
-	   "jmp eq?_finish\n"
-	   
-	   "eq?_true:\n"
-	   "mov rax, L_const4\n"
-	   
-	   "eq?_finish:\n"
-	   "leave\n"
-	   "ret\n"
-	   "eq?_exit:\n" )))
-
-
-(define cg-bin-plus
-	(lambda ()
-		(string-append "")))
-
-
-(define cg-bin-div
-	(lambda ()
-		(string-append "")))
-
-(define cg-bin-mul
-	(lambda ()
-		(string-append "")))
-
-(define cg-apply
- 	(lambda()       
-		(string-append "")))
-
-(define cg-symbol->string
+(define gen-symbol->string
 	(lambda ()
 		(string-append
 			"mov rdi, 16\n"
             "call malloc\n"
             "mov rbx, qword 0\n"
             "MAKE_LITERAL_CLOSURE rax, rbx, symbol_to_string_body\n"
-            "mov [L_global33], rax\n"
+            "mov [symbol_to_string], rax\n"
             "jmp symbol_to_string_exit\n"
             
             "symbol_to_string_body:\n"
@@ -1823,328 +2862,110 @@
 	        "ret\n"
 	        "symbol_to_string_exit:\n" )))
 
-(define cg-vector
-	(lambda()
-		(string-append "")))
+(define gen-string->symbol
+	(lambda ()
+		(string-append
+			"mov rdi, 16\n"
+            "call malloc\n"
+            "mov rbx, qword 0\n"
+            "MAKE_LITERAL_CLOSURE rax, rbx, string_to_symbol_body\n"
+            "mov qword [string_to_symbol], rax\n"
+            "jmp string_to_symbol_exit\n"
+            
+            "string_to_symbol_body:\n"
+			"push rbp\n"
+			"mov rbp, rsp\n"
+			"mov r11, An(0)\n" ;r11= pointer to arg
+			;"mov r11, [r11]\n"
+		    "mov r10, [symbol_table]\n" ;content of fymbol_table, either a pair or const_2
+		    ;"mov r10, [r10]\n"				
+	        "cmp r10, const_2\n" 
+	        "je string_to_symbol_create_symbol\n"
+    		
+	        "string_to_symbol_loop:\n"
+			"mov r12, r10\n"
+			"mov r12, [r12]\n"
+			"DATA_UPPER r12\n"
+			"add r12 , start_of_data\n"
+			"mov r12, [r12]\n"
+			"DATA r12\n"
+			"add r12 , start_of_data\n"
+      		;"cmp r12, r11\n"  
+      		"STRING_COMPARE r12, r11\n"
+      		"cmp rax, const_3\n" 
+	        "je string_to_symbol_found\n"
+		    ;"CDR r10\n"
+		    "mov r10, [r10]\n"
+		    "DATA_LOWER r10\n"
+			"add r10, start_of_data\n"
+			"cmp r10, const_2\n"
+      		"je string_to_symbol_create_symbol\n"
+	        "jmp string_to_symbol_loop\n"
+	            
+	        "string_to_symbol_found:\n"
+	        "mov r10, [r10]\n"
+	        "DATA_UPPER r10\n"
+			"add r10, start_of_data\n"
+		   	"mov rax, r10\n"
+	        "jmp string_to_symbol_finish\n"
+	      
+	        "string_to_symbol_create_symbol:\n"
+	        "push r11\n"
+	        "mov rdi,8\n"
+	        "call malloc\n"
+	        "pop r11\n"
+	        "MAKE_MALLOC_LITERAL_SYMBOL rax , r11\n"
+			"mov r11, rax\n"
+      		"mov r13, r11\n"                    ;backup
+      		"mov r14, [symbol_table]\n"       
+      
+      		"push r11\n"
+      		"push r14\n"
+       		"mov rdi, 8\n"
+       		"call malloc\n"
+       		"pop r14\n"
+       		"pop r11\n"
+       		"MAKE_MALLOC_LITERAL_PAIR rax, r11 ,r14\n"
+      		"mov [symbol_table],rax\n"
+      		"mov rax, r13\n"
 
-	(define cg-vector-length
-	  (lambda()
-	    (string-append "")))
+	        "string_to_symbol_finish:\n"
+	        "leave\n"
+	        "ret\n"
+	        "string_to_symbol_exit:\n"      
+	)))
 
-(define cg-vector-ref
-	(lambda()
-		(string-append "")))
+(define compile-scheme-file
+	(lambda (source-file target-file)
+		(let* ((parsed-exp-list 	(pipeline (append-scheme-lib-functions (file->list source-file))))
+			   (epilogue 			"push qword [rax]\ncall write_sob_if_not_void\nadd rsp, 1*8\n"))
+			   (create-const-table parsed-exp-list)
 
-(define cg-vector-set
-  (lambda()
-    (string-append "")))
+			   (display (format "const-table ~a\n" const-table))
 
 
-(define built-in-map
-  ;; <func-name, func-label>
-  '((null?  "L_global0")
-    (boolean? "L_global1")
-    (char? "L_global2")
-    (integer? "L_global3")
-    (number? "L_global4")
-    (rational? "L_global5")
-    (pair? "L_global6")
-    (string? "L_global7")
-    (symbol? "L_global8")
-    (vector? "L_global9")
-    (procedure? "L_global10")
+			   (create-global-var-table parsed-exp-list)
 
-    (apply "L_global11")
-
-    (b< "L_global12")
-    (b= "L_global13")
-    (b+ "L_global14")
-    (b/ "L_global15")
-    (b* "L_global16")
-    (b- "L_global17")
-
-    (car "L_global18")
-    (cdr "L_global19")
-    (char->integer "L_global20")
-    (cons "L_global21")
-    (denominator "L_global22")
-    (eq? "L_global23")
-    (integer->char "L_global24")
-    (make-string "L_global25")
-    (make-vector "L_global26")
-    (numerator "L_global27")
-    (remainder "L_global28")
-    (string-length "L_global29")
-    (string-ref "L_global30")
-    (string-set! "L_global31")
-    (string->symbol "L_global32")
-    (symbol->string "L_global33")
-    (vector "L_global34")
-    (vector-length "L_global35")
-    (vector-ref "L_global36")
-    (vector-set! "L_global37")
-    (zero? "L_global38")))
-
-(define built-in-funcs
-  (map first built-in-map))
-
-(define built-in?
-  (lambda (func)
-    (member func built-in-funcs)))
-
-(define cg-built-in
-  (lambda ()
-    (string-append
-     cg-null?
-     newLine
-     cg-bool?
-     newLine
-     cg-char?
-     newLine
-     cg-integer?
-     newLine
-     cg-number?
-     newLine
-     cg-rational?
-     newLine
-     cg-pair?
-     newLine
-     cg-string?
-     newLine
-     cg-symbol?
-     newLine
-     cg-vector?
-     newLine
-     cg-closure?
-     newLine
-     (cg-cons)
-     newLine
-     (cg-car)
-     newLine
-     (cg-cdr)
-     newLine
-     (cg-string->symbol)
-     newLine
-     (cg-integer->char)
-     newLine 
-     (cg-char->integer)
-     newLine
-     (cg-numerator)
-     newLine
-     (cg-eq)
-     newLine
-     (cg-make-string)
-     newLine
-     (cg-make-vector)
-     newLine
-     (cg-remainder)
-     newLine
-     (cg-string-length)
-     newLine
-     (cg-string-ref)
-     newLine
-     (cg-string-set)
-     newLine
-     (cg-less-than)
-     newLine 
-     (cg-eq?)
-     newLine
-     (cg-bin-plus)
-     newLine
-     (cg-bin-div)
-     newLine
-     (cg-bin-mul)
-     newLine
-     (cg-bin-minus)
-     newLine
-     (cg-apply)
-     newLine
-     (cg-symbol->string)
-     newLine
-     (cg-vector)
-     newLine
-     (cg-vector-length)
-     newLine
-     (cg-vector-set)
-     newLine
-     (cg-zero?)
-     newLine
-     )))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Type Checks ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define cg-type-check
-  (lambda (type-label . sub-types)
-    (string-append
-     type-label "_create_closure:" newLine
-     "mov rdi, 16\n"
-     "call malloc\n"
-     "mov rbx, qword 0\n"
-     "MAKE_LITERAL_CLOSURE rax, rbx, " type-label "_body\n"
-     "mov [" type-label "], rax\n"
-     "jmp " type-label "_exit\n"
-     
-     type-label "_body:" newLine
-     tab "push rbp" newLine
-     tab "mov rbp, rsp" newLine
-     tab "PUSHA" newLine
-     tab "MOV rax, [rbp + 8 + 1*8]" newLine
-
-     type-label "_predicate:" newLine
-     (fold-left string-append
-		""
-		(map (lambda (sub)
-		       (string-append
-			tab "CMP rax, " sub newLine
-			tab "JE " type-label "_match" newLine))
-		     sub-types))
-
-     tab "MOV rax, [L_const2]" newLine
-     tab "JMP " type-label "_end" newLine
-     newLine
-     type-label "_match:" newLine
-     tab "MOV rax, [L_const4]" newLine
-     type-label "_end:" newLine
-     
-     tab "POPA" newLine
-     tab "leave" newLine
-     tab "ret" newLine
-     type-label "_exit:" newLine
-     tab "NOP" newLine)))
-
-(define make-pred-label
-  (lambda (index)
-    (string-append fvar-label (number->string index))))
-
-(define cg-null?
-  (cg-type-check (make-pred-label 0) "T_NIL"))
-
-(define bool-pred-label "L_bool_check")
-
-(define cg-bool?
-  (cg-type-check(make-pred-label 1) "T_BOOL"))
-
-(define char-pred-label "L_char_check")
-
-(define cg-char?
-  (cg-type-check (make-pred-label 2) "T_CHAR"))
-
-(define integer-pred-label "L_integer_check")
-
-(define cg-integer?
-  (cg-type-check (make-pred-label 3) "T_INTEGER"))
-
-(define number-pred-label "L_number_check")
-
-(define cg-number?
-  (cg-type-check (make-pred-label 4) "T_INTEGER" "T_FRACTION"))
-
-(define rational-pred-label "L_rational_check")
-
-(define cg-rational?
-  (cg-type-check (make-pred-label 5) "T_INTEGER" "T_FRACTION"))
-
-(define pair-pred-label "L_pair_check")
-
-(define cg-pair?
-  (cg-type-check (make-pred-label 6) "T_PAIR"))
-
-(define string-pred-label "L_string_check")
-
-(define cg-string?
-  (cg-type-check (make-pred-label 7) "T_STRING"))
-
-(define symbol-pred-label "L_symbol_check")
-
-(define cg-symbol?
-  (cg-type-check (make-pred-label 8) "T_SYMBOL"))
-
-(define vector-pred-label "L_vector_check")
-
-(define cg-vector?
-  (cg-type-check (make-pred-label 9) "T_VECTOR"))
-
-(define closure-pred-label "L_closure_check")
-
-(define cg-closure?
-  (cg-type-check (make-pred-label 10) "T_CLOSURE"))
-
-(define cg-zero?
-    (lambda()
-        (string-append
-	 tab "mov rdi, 16" newLine
-	 tab "call malloc\n"
-	 tab "mov rbx, qword 0\n"
-	 tab "MAKE_LITERAL_CLOSURE rax, rbx, zero?_body\n"
-	 tab "mov [L_global38], rax\n"
-	 tab "jmp zero?_exit\n"
-	 newLine
-	 tab "zero?_body:\n"
-	 tab "push rbp\n"
-	 tab "mov rbp, rsp\n"         
-	 tab "mov rbx, arg_count\n"
-	 tab "cmp rbx, 1\n" 
-	 tab "jne zero?_finish\n"
-	 newLine
-	 tab "mov rax, An(0)\n"
-	 tab "mov rax, [rax]\n"
-	 tab "TYPE rax\n"
-	 tab "cmp rax, T_INTEGER\n"
-	 tab "je zero?_check\n"
-	 tab "cmp rax, T_FRACTION\n"
-	 tab "jne zero?_finish\n"
-	 newLine
-	 tab "zero?_check:\n"
-	 tab "mov rax, An(0)\n"
-	 tab "mov rax, [rax]\n"
-	 tab "DATA rax\n"
-	 tab "cmp rax, 0\n"
-	 tab "je zero?_true\n"
-	 tab "mov rax, " (sobFalse) newLine
-	 tab "jmp zero?_finish\n"
-	 tab "zero?_true:\n"
-	 tab "mov rax, " (sobTrue) newLine
-
-	 tab "zero?_finish:\n"
-	 tab "leave\n"
-	 tab "ret\n"
-	 tab "zero?_exit:\n" )))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Pair Operations ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Binary Operations ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;; String Operations ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Vector Operations ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;; Closure Generation ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define cg-built-in-closures
-  (lambda (rows-to-create)
-    (fold-left string-append
-	       ""
-	       (map (lambda (row)
-		      (let ((var (second row))
-			    (index (first row))
-			    (label (second (assoc (second row) built-in-map))))
-			(create-built-in-closure var index label)))
-		    rows-to-create))))
-
-(define create-built-in-closure
-  (lambda (var index func-label)
-    (string-append
-     tab "MOV rdi, 16" newLine 
-     tab "call malloc" newLine ;; Env = 8 * num_of_vars
-     tab "MOV rbx, rax" newLine
-     tab "PUSH rbx" newLine
-     newLine
-     tab "MOV rdi, 8" newLine
-     tab "call malloc" newLine ;; Body-code label
-     tab "POP rbx" newLine ;;rax=malloc(8), rbx=malloc(16)
-     tab "MOV rdx, " func-label newLine
-     tab "MAKE_LITERAL_CLOSURE rax, rbx, rdx" newLine
-     tab "MOV rbx, " fvar-label (number->string index) newLine
-     tab "MOV [rbx], rax" newLine
-     newLine)))
-
+			   (string->file
+					target-file
+					(string-append
+						"%include \"project/scheme.s\"\nsection .data\nstart_of_data:\n"
+						(get-const-string)
+						(get-fvar-string)
+						(gen-symbol-table const-table 0 (count-symbols))
+						"\nsection .text\nmain:\n"
+						"push 0\n"
+						"push 0\n"
+						"push exit_compilation\n"
+						"push rbp\n"
+						"mov rbp, rsp\n"
+						(code-gen-library-functions)
+						(fold-left (lambda(acc pe) 
+	                                    (string-append acc (code-gen pe) epilogue))
+									""
+								parsed-exp-list)
+						"exit_compilation:\n"
+						"leave\n"
+						"mov rax, 0\n"
+						"call exit\n"
+						)))))
