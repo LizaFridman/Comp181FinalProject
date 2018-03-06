@@ -2941,7 +2941,7 @@
 			   (epilogue 			"push qword [rax]\ncall write_sob_if_not_void\nadd rsp, 1*8\n"))
 			   (create-const-table parsed-exp-list)
 
-			   (display (format "const-table ~a\n" const-table))
+			   ;;(display (format "const-table ~a\n" const-table))
 
 
 			   (create-global-var-table parsed-exp-list)
